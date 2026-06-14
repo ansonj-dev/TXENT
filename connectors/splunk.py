@@ -397,3 +397,126 @@ class SplunkConnector:
         """Convenience wrapper: list all Splunk indexes via MCP Server."""
         return await self.mcp_call_tool("splunk_get_indexes")
 
+    # ── Splunk AI Toolkit (AITK) — Hosted Models ───────────────────────────
+
+    async def aitk_analyze(self, text: str, model: str = "foundation_sec") -> dict[str, Any]:
+        """
+        Calls a Splunk-hosted AI model via the AI Toolkit REST API.
+        
+        Available hosted models:
+        - foundation_sec: Foundation-Sec-1.1-8B-Instruct (security-focused LLM)
+        - deep_time_series: Cisco Deep Time Series Model (anomaly forecasting)
+        - gpt_oss: General purpose hosted LLM (gpt-oss-120b)
+        
+        These are CLOUD models hosted by Splunk — no GPU required on your machine.
+        Access requires the AI Toolkit app (Splunkbase #2890) installed.
+        """
+        if not self.splunk_host or not self.splunk_token:
+            return self._simulate_aitk_response(text, model)
+
+        # AITK REST endpoint pattern
+        aitk_url = f"https://{self.splunk_host}:{self.splunk_port}/services/ML/v2/models/{model}/predict"
+
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.splunk_token}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "input": {"text": text},
+                "params": {"max_tokens": 500, "temperature": 0.2}
+            }
+            async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
+                response = await client.post(aitk_url, json=payload, headers=headers)
+                response.raise_for_status()
+                return {"status": "success", "model": model, "result": response.json()}
+        except Exception as e:
+            # Graceful fallback to simulation
+            result = self._simulate_aitk_response(text, model)
+            result["live_error"] = str(e)
+            return result
+
+    def _simulate_aitk_response(self, text: str, model: str) -> dict[str, Any]:
+        """Simulated AITK response for demo/development when Splunk is not connected."""
+        t_lower = text.lower()
+
+        if model == "foundation_sec":
+            # Simulate Foundation-Sec security analysis
+            severity = "high" if any(w in t_lower for w in ["timeout", "exhaustion", "failure", "error"]) else "medium"
+            classification = "operational_anomaly" if "cache" in t_lower or "memory" in t_lower else "service_degradation"
+            return {
+                "status": "simulated",
+                "model": "Foundation-Sec-1.1-8B-Instruct",
+                "result": {
+                    "classification": classification,
+                    "severity": severity,
+                    "confidence": 0.89,
+                    "analysis": f"Foundation-Sec analysis: The incident pattern indicates a {classification} event. "
+                                f"Severity assessed as {severity} based on keyword correlation with known threat signatures.",
+                    "recommended_investigation": [
+                        "Check service dependency chain for cascading failures",
+                        "Verify recent configuration changes in deployment pipeline",
+                        "Analyze connection pool metrics for resource exhaustion patterns"
+                    ]
+                }
+            }
+        elif model == "deep_time_series":
+            # Simulate Cisco Deep Time Series anomaly forecast
+            return {
+                "status": "simulated",
+                "model": "Cisco Deep Time Series Model",
+                "result": {
+                    "anomaly_detected": True,
+                    "anomaly_score": 0.87,
+                    "forecast_horizon": "30m",
+                    "predicted_trend": "degrading",
+                    "expected_recovery": "45-60 minutes without intervention",
+                    "time_series_features": {
+                        "trend": "increasing_latency",
+                        "seasonality": "none_detected",
+                        "change_point": "detected_at_-12m",
+                        "forecast_confidence": 0.82
+                    },
+                    "recommendation": "Proactive scaling recommended within 15 minutes to prevent SLA breach."
+                }
+            }
+        else:
+            return {
+                "status": "simulated",
+                "model": model,
+                "result": {"text": f"Simulated {model} response for: {text[:100]}"}
+            }
+
+    # ── Splunk Alert Webhook — Feedback Loop ────────────────────────────────
+
+    def parse_splunk_alert_webhook(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """
+        Parses an incoming Splunk saved search alert webhook payload
+        into a standardized TXENT incident format.
+        
+        This enables the feedback loop: Splunk detects anomaly → webhook fires →
+        TXENT ingests incident → Kick checks → Agent investigates → results pushed back to Splunk.
+        """
+        # Splunk alert webhook payload structure
+        results = payload.get("result", payload.get("results", {}))
+        search_name = payload.get("search_name", "Unknown Splunk Alert")
+        
+        # Extract key fields from the alert
+        service = results.get("host", results.get("service", "unknown-service"))
+        severity = results.get("severity", "high")
+        description = results.get("_raw", results.get("message", f"Alert triggered: {search_name}"))
+
+        incident = {
+            "incident_id": f"splunk-alert-{int(time.time())}",
+            "title": search_name,
+            "description": str(description)[:500],
+            "service": service,
+            "severity": severity,
+            "source": "splunk:saved_search",
+            "environment": results.get("environment", "production"),
+            "timestamp": time.time(),
+            "splunk_search_name": search_name,
+            "raw_payload": payload
+        }
+
+        return incident

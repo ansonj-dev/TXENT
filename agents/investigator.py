@@ -74,8 +74,27 @@ class AutonomousInvestigationAgent:
         deployments = self.splunk.simulation_state["recent_deployments"]
         log_step("Change Log Check", "completed", f"Found {len(deployments)} recent deployments. Last release: payment-api v1.4.2.")
 
-        # 4. Synthesize root cause analysis
-        log_step("Root Cause Analysis", "running", "Correlating metrics anomalies against operational archetypes and historical schemas.")
+        # 4. Call Splunk AITK Hosted Models for enhanced analysis
+        # Foundation-Sec: Security-focused classification of the incident
+        log_step("AITK Foundation-Sec", "running", "Calling Splunk Hosted Model Foundation-Sec-1.1-8B-Instruct for security classification.")
+        incident_text = f"{incident.get('title', '')} - {incident.get('description', '')} - Service: {target_service}"
+        sec_analysis = await self.splunk.aitk_analyze(incident_text, model="foundation_sec")
+        log_step("AITK Foundation-Sec", sec_analysis.get("status", "unknown"),
+                 f"Classification: {sec_analysis.get('result', {}).get('classification', 'N/A')} | "
+                 f"Severity: {sec_analysis.get('result', {}).get('severity', 'N/A')}")
+
+        # Cisco Deep Time Series: Anomaly forecasting on the affected service metrics
+        log_step("AITK Deep Time Series", "running", "Calling Cisco Deep Time Series Model for anomaly forecast and trend prediction.")
+        ts_analysis = await self.splunk.aitk_analyze(
+            f"Service {target_service} latency and error rate metrics for anomaly detection",
+            model="deep_time_series"
+        )
+        log_step("AITK Deep Time Series", ts_analysis.get("status", "unknown"),
+                 f"Anomaly Score: {ts_analysis.get('result', {}).get('anomaly_score', 'N/A')} | "
+                 f"Trend: {ts_analysis.get('result', {}).get('predicted_trend', 'N/A')}")
+
+        # 5. Synthesize root cause analysis (enriched with AITK outputs)
+        log_step("Root Cause Analysis", "running", "Correlating metrics anomalies, AITK classifications, and operational archetypes.")
         
         evidence = []
         root_cause = "Unknown Anomaly"
@@ -163,7 +182,13 @@ class AutonomousInvestigationAgent:
             "narrative_rca": narrative_rca,
             "investigation_latency_ms": duration,
             "health_status": health_status,
-            "metrics_data": metrics_data
+            "metrics_data": metrics_data,
+            "aitk_security_analysis": sec_analysis.get("result", {}),
+            "aitk_time_series_forecast": ts_analysis.get("result", {}),
+            "aitk_models_used": [
+                sec_analysis.get("model", "foundation_sec"),
+                ts_analysis.get("model", "deep_time_series")
+            ]
         }
 
         # ── Push investigation results back to Splunk via HEC ──

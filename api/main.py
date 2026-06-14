@@ -317,6 +317,120 @@ async def hec_test() -> dict[str, Any]:
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
+# ── Splunk Alert Webhook — Feedback Loop ────────────────────────────────────
+
+class SplunkAlertWebhookPayload(BaseModel):
+    """Payload format sent by Splunk saved search webhook alert actions."""
+    search_name: str = "Unknown Alert"
+    result: dict[str, Any] = {}
+    results_link: str = ""
+    app: str = ""
+    owner: str = ""
+
+@app.post("/api/webhook/splunk-alert")
+async def splunk_alert_webhook(payload: SplunkAlertWebhookPayload) -> dict[str, Any]:
+    """
+    Webhook endpoint for Splunk saved search alerts.
+    
+    Configure in Splunk: Settings → Searches → [Your Search] → Webhook Action
+    URL: http://<TXENT_HOST>:8000/api/webhook/splunk-alert
+    
+    This creates the complete feedback loop:
+    Splunk detects anomaly → fires webhook → TXENT ingests → Kick checks → 
+    Agent investigates → results pushed back to Splunk via HEC.
+    """
+    try:
+        dw = get_orchestrator()
+        
+        # 1. Parse the Splunk alert into a TXENT incident
+        incident = dw.splunk.parse_splunk_alert_webhook(payload.model_dump())
+        
+        # 2. Ingest the incident into memory layers
+        text = f"{incident['title']}: {incident['description']}. Service: {incident['service']}. Source: splunk:saved_search."
+        dw.ingest(
+            text=text,
+            source="splunk:saved_search",
+            metadata={
+                "incident_id": incident["incident_id"],
+                "severity": incident["severity"],
+                "service": incident["service"],
+                "environment": incident["environment"]
+            }
+        )
+        
+        # 3. Run full layered retrieval with Kick check
+        context = await dw.retrieve(incident["title"], kick_enabled=True)
+        
+        # 4. If Kick fired, the autonomous investigation already ran
+        return {
+            "status": "processed",
+            "incident": incident,
+            "kick_fired": context.get("kick", {}).get("fired", False),
+            "agent_investigation": context.get("agent_investigation"),
+            "message": "Splunk alert received, ingested into TXENT memory, and processed through the full investigation pipeline."
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Webhook processing failed: {exc}")
+
+# ── Splunk AITK Hosted Models Endpoints ─────────────────────────────────────
+
+class AITKAnalyzeRequest(BaseModel):
+    """Request to analyze text using a Splunk hosted model."""
+    text: str = Field(..., min_length=1)
+    model: str = Field(default="foundation_sec", description="Model: foundation_sec, deep_time_series, or gpt_oss")
+
+@app.post("/api/splunk/aitk/analyze")
+async def aitk_analyze(req: AITKAnalyzeRequest) -> dict[str, Any]:
+    """
+    Calls a Splunk-hosted AI model via the AI Toolkit.
+    
+    Available models:
+    - foundation_sec: Foundation-Sec-1.1-8B-Instruct (security LLM)
+    - deep_time_series: Cisco Deep Time Series Model (anomaly forecast)
+    - gpt_oss: General purpose hosted LLM
+    
+    These are CLOUD models — no GPU required. Falls back to simulation if AITK not configured.
+    """
+    try:
+        return await get_orchestrator().splunk.aitk_analyze(req.text, model=req.model)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@app.get("/api/splunk/aitk/models")
+async def aitk_list_models() -> dict[str, Any]:
+    """Lists the available Splunk hosted models and their status."""
+    dw = get_orchestrator()
+    is_live = bool(dw.splunk.splunk_host and dw.splunk.splunk_token)
+    return {
+        "mode": "live" if is_live else "simulation",
+        "models": [
+            {
+                "id": "foundation_sec",
+                "name": "Foundation-Sec-1.1-8B-Instruct",
+                "type": "security_llm",
+                "provider": "Cisco / Splunk",
+                "description": "Security-focused LLM for incident classification and threat analysis",
+                "available": True
+            },
+            {
+                "id": "deep_time_series",
+                "name": "Cisco Deep Time Series Model",
+                "type": "anomaly_forecast",
+                "provider": "Cisco / Splunk",
+                "description": "Time series anomaly detection and trend forecasting",
+                "available": True
+            },
+            {
+                "id": "gpt_oss",
+                "name": "GPT-OSS-120B",
+                "type": "general_llm",
+                "provider": "Splunk",
+                "description": "General purpose hosted large language model",
+                "available": True
+            }
+        ]
+    }
+
 # ── Standard TXENT Endpoints ────────────────────────────────────────────────
 
 async def call_llm(context: str, query: str, max_tokens: int, retrieval_context: dict[str, Any]) -> str:
