@@ -10,9 +10,3 @@ memory_store/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
-
-# Ignore hackathon artifacts and notes
-*.md
-!README.md
-*.txt
-*.docx

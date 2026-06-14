@@ -1,0 +1,86 @@
+Dreamweave Demo Video Script (3:30)
+
+Target Audience: Hackathon judges, developers, and enterprise users.
+Tone: Innovative, transparent, professional, and dynamic.
+
+====================================================================
+Scene 1: The Hook & Introduction (0:00 - 0:30)
+====================================================================
+[Visual]
+* Start with a clean, dark-themed cinematic intro.
+* Quick flashes of standard, cluttered AI chat interfaces looking confusing, followed by a smooth transition to the sleek, glassmorphic Dreamweave UI.
+* The Dreamweave logo softly glows into the center of the screen.
+
+[Audio (Voiceover)]
+"We're interacting with AI more than ever, but there's a fundamental problem. Modern LLMs are incredibly smart, but they suffer from amnesia. They treat every conversation in a vacuum, and their retrieval processes are hidden inside a black box. 
+(Pause) 
+Enter Dreamweave. Dreamweave is a next-generation AI platform that doesn't just process text—it builds a persistent, structural memory timeline. Let's take a look under the hood."
+
+
+====================================================================
+Scene 2: Ingestion & The Living Graph (0:30 - 1:00)
+====================================================================
+[Visual]
+* Screen recording of a user dragging and dropping multiple complex documents (PDFs, code files) into the Dreamweave ingestion zone.
+* The UI reacts beautifully. We see the 'Structural Memory Timeline' assembling in real-time.
+* Zoom in on the Knowledge Graph visualization as nodes and edges connect.
+
+[Audio (Voiceover)]
+"It starts with ingestion. When you upload documents to Dreamweave, we don't just dump them into a static database. We weave them into a living knowledge graph. As documents are processed, you can actually watch the relationships forming on our Structural Memory Timeline. Concepts are mapped, linked, and stored with high fidelity, creating a unified brain that remembers context not just from your current session, but across your entire workflow."
+
+
+====================================================================
+Scene 3: Chat, Retrieval & Transparency (1:00 - 1:45)
+====================================================================
+[Visual]
+* The user types a complex query into the chat interface.
+* The AI begins responding with true token-by-token streaming—fast and fluid.
+* Crucially, as the AI streams, 'Retrieval Cards' organically slide into view next to the chat, highlighting the exact sources, paragraphs, and graph nodes the AI is referencing.
+
+[Audio (Voiceover)]
+"But memory is only useful if you can access it transparently. When you ask Dreamweave a question, you get true, ultra-low latency token-by-token streaming. More importantly, we've completely eliminated the black box. As the AI generates its response, dynamic retrieval cards manifest realistically alongside the chat. You see exactly which documents, which nodes, and which historical contexts the model is pulling from in real-time. It's verifiable AI you can trust."
+
+
+====================================================================
+Scene 4: "Kick Mode" & Advanced Diagnostics (1:45 - 2:30)
+====================================================================
+[Visual]
+* The cursor clicks a sleek toggle labeled 'Kick Mode'.
+* The UI transforms, revealing advanced diagnostic overlays. Confidence scores, retrieval latencies, and vector distance metrics appear.
+* The user investigates a specific retrieval card to see the raw JSON/data backing it.
+
+[Audio (Voiceover)]
+"For developers and power users, transparency needs to go deeper. That's why we built 'Kick Mode.' With a single click, Dreamweave transforms into an advanced diagnostic environment. You get immediate visibility into retrieval latencies, vector distances, and confidence scores. It allows engineers to debug prompts, optimize data structures, and fine-tune the cognitive engine without ever leaving the primary interface."
+
+
+====================================================================
+Scene 5: Hardware & AMD Telemetry (2:30 - 3:00)
+====================================================================
+[Visual]
+* Pan to a beautiful, real-time dashboard labeled 'AMD GPU Telemetry'.
+* Graphs show VRAM usage, compute load, and power draw dynamically fluctuating as a heavy query is processed.
+* Show the seamless integration of hardware and software working in unison.
+
+[Audio (Voiceover)]
+"To power this level of dynamic visualization and instant retrieval, you need serious compute. Dreamweave is heavily optimized for high-performance hardware, featuring a live AMD GPU telemetry dashboard built right in. Whether you're running locally or deploying to the cloud, you can monitor VRAM, compute loads, and inference speeds in real-time. We've bridged the gap between the silicon and the software, ensuring maximum efficiency for the most demanding workloads."
+
+
+====================================================================
+Scene 6: Conclusion & Call to Action (3:00 - 3:30)
+====================================================================
+[Visual]
+* A fast-paced montage of the best UI moments: the graph expanding, retrieval cards popping up, the AMD dashboard pulsing.
+* Fade to the Dreamweave logo and a URL or QR code.
+
+[Audio (Voiceover)]
+"Dreamweave isn't just another chat wrapper. It is a fully transparent, memory-aware cognitive architecture designed for the future of enterprise AI. It remembers, it connects, and it shows its work—every single time. 
+(Pause) 
+Experience the next evolution of persistent AI. Welcome to Dreamweave."
+
+
+====================================================================
+Production Tips for the Demo:
+====================================================================
+* Pacing: Keep the cursor movements smooth. Don't rush the drag-and-drop or the toggling of "Kick Mode."
+* Visuals: Since the frontend is a static HTML file (dreamweave.html), ensure your local server is running smoothly so the API calls to FastAPI return data instantly without lag.
+* Music: Use an upbeat, modern electronic track. Start the track relatively calm, build up during the "Kick Mode" (1:45), and hit a strong crescendo right when you show the AMD GPU dashboard.

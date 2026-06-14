@@ -19,14 +19,14 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.responses import FileResponse, StreamingResponse
 
-from core.orchestrator import DreamWeaveOrchestrator
+from core.orchestrator import TXENTOrchestrator
 
 load_dotenv()
 
 LLM_URL = os.getenv("LLM_URL", "http://localhost:30000/v1/chat/completions")
 LLM_MODEL = os.getenv("LLM_MODEL", "Qwen/Qwen2.5-7B-Instruct")
 
-orchestrator: DreamWeaveOrchestrator | None = None
+orchestrator: TXENTOrchestrator | None = None
 
 class IngestRequest(BaseModel):
     text: str = Field(..., min_length=1)
@@ -85,7 +85,7 @@ class ExecuteActionRequest(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global orchestrator
-    orchestrator = DreamWeaveOrchestrator()
+    orchestrator = TXENTOrchestrator()
     yield
 
 app = FastAPI(title="TXENT API", version="1.0.0", lifespan=lifespan)
@@ -99,7 +99,7 @@ app.add_middleware(
 
 FRONTEND_HTML = Path(__file__).resolve().parents[1] / "frontend" / "txent.html"
 
-def get_orchestrator() -> DreamWeaveOrchestrator:
+def get_orchestrator() -> TXENTOrchestrator:
     if orchestrator is None:
         raise HTTPException(status_code=503, detail="TXENT orchestrator is still starting")
     return orchestrator
@@ -288,7 +288,36 @@ async def get_incidents() -> dict[str, Any]:
         "history": dw.splunk.simulation_state.get("incident_history", [])
     }
 
-# ── Standard Dreamweave/TXENT Endpoints ─────────────────────────────────────
+# ── Splunk MCP & HEC Endpoints ──────────────────────────────────────────────
+
+@app.get("/api/splunk/mcp/indexes")
+async def mcp_list_indexes() -> dict[str, Any]:
+    """Lists available Splunk indexes via MCP Server."""
+    try:
+        return await get_orchestrator().splunk.mcp_list_indexes()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@app.post("/api/splunk/mcp/search")
+async def mcp_search(query: str = "index=main | head 10") -> dict[str, Any]:
+    """Runs an SPL search via the Splunk MCP Server."""
+    try:
+        return await get_orchestrator().splunk.mcp_search(query)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@app.post("/api/splunk/hec/test")
+async def hec_test() -> dict[str, Any]:
+    """Sends a test event to Splunk via HEC to verify connectivity."""
+    try:
+        return await get_orchestrator().splunk.push_to_splunk(
+            event_data={"test": True, "message": "TXENT HEC connectivity test", "timestamp": time.time()},
+            sourcetype="txent:test"
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+# ── Standard TXENT Endpoints ────────────────────────────────────────────────
 
 async def call_llm(context: str, query: str, max_tokens: int, retrieval_context: dict[str, Any]) -> str:
     payload = {

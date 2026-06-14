@@ -153,7 +153,7 @@ class AutonomousInvestigationAgent:
 
         duration = int((time.time() - start_time) * 1000)
         
-        return {
+        investigation_result = {
             "incident_id": incident.get("incident_id"),
             "root_cause": root_cause,
             "confidence": confidence,
@@ -165,6 +165,32 @@ class AutonomousInvestigationAgent:
             "health_status": health_status,
             "metrics_data": metrics_data
         }
+
+        # ── Push investigation results back to Splunk via HEC ──
+        # This creates the bidirectional data flow: Splunk → TXENT → Splunk
+        log_step("HEC Push", "running", "Pushing investigation results back to Splunk index via HEC.")
+        hec_result = await self.splunk.push_to_splunk(
+            event_data={
+                "investigation": investigation_result,
+                "incident_title": incident.get("title"),
+                "root_cause": root_cause,
+                "confidence": confidence,
+                "service": target_service,
+                "severity": incident.get("severity"),
+            },
+            sourcetype="txent:investigation"
+        )
+        log_step("HEC Push", hec_result.get("status", "unknown"), f"Splunk HEC response: {hec_result.get('status')}")
+
+        # Also try MCP search to demonstrate MCP tool usage
+        log_step("MCP Tool Call", "running", "Calling Splunk MCP Server for additional context.")
+        mcp_result = await self.splunk.mcp_search(f"index=main sourcetype=txent:investigation | head 5")
+        log_step("MCP Tool Call", mcp_result.get("status", "unknown"), f"MCP result: {mcp_result.get('status')}")
+
+        investigation_result["splunk_hec_status"] = hec_result.get("status")
+        investigation_result["splunk_mcp_status"] = mcp_result.get("status")
+
+        return investigation_result
 
     async def _call_llm_for_rca(self, incident: dict[str, Any], evidence: list[str], root_cause: str, health_status: dict[str, str]) -> str:
         prompt = (

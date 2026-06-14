@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 import asyncio
-from core.orchestrator import DreamWeaveOrchestrator
+from core.orchestrator import TXENTOrchestrator
 from connectors.splunk import SplunkConnector
 from agents.investigator import AutonomousInvestigationAgent
 
@@ -13,7 +13,7 @@ class TestTXENTFlow(unittest.TestCase):
 
     def setUp(self) -> None:
         # Initialize orchestrator (rebranded internally to TXENT)
-        self.orchestrator = DreamWeaveOrchestrator()
+        self.orchestrator = TXENTOrchestrator()
         
     def test_rebranding_reloaded(self):
         """Verifies that the orchestrator initializes with rebranding variables."""

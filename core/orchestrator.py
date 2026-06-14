@@ -22,11 +22,10 @@ from agents.investigator import AutonomousInvestigationAgent
 
 load_dotenv()
 
-class DreamWeaveOrchestrator:
+class TXENTOrchestrator:
     """
-    Coordinates TXENT's layered memory engines and agent investigations.
-    Retained the class name as DreamWeaveOrchestrator to prevent breaking imports in other files,
-    but all logs, paths, and internal operations are fully rebranded to TXENT.
+    Coordinates TXENT's layered memory engines, Splunk connectors,
+    Kick Mechanism, and autonomous investigation agents.
     """
 
     def __init__(self) -> None:
@@ -363,3 +362,8 @@ class DreamWeaveOrchestrator:
     def _auto_save(self) -> None:
         if os.getenv("DREAMWEAVE_AUTO_SAVE", "true").lower() == "true":
             self.save_memory()
+
+
+# Backward-compatible alias
+DreamWeaveOrchestrator = TXENTOrchestrator
+

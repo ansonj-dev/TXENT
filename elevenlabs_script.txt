@@ -1,0 +1,35 @@
+Every time you open ChatGPT or Claude, you are talking to an amnesiac. 
+
+Sure, these models have read the entire internet. But they forget who you are the moment you close the tab. If you're building a complex project, the AI forgets your core context just twenty messages deep. Modern AI doesn't actually learn over time... it just resets. 
+
+To try and fix this, the industry relies on RAG—Retrieval-Augmented Generation. But let's be honest, RAG is just a glorified search engine. It takes your documents, chops them up into tiny, isolated pieces, and blindly hopes it retrieves the right chunk later. It doesn’t understand how concepts connect. It doesn't understand structure. 
+
+That is why we built Dreamweave. Dreamweave is not a chatbot. It is a Continuous, Structural Memory Engine.
+
+Instead of just saving raw text in a flat database, Dreamweave wires information together exactly the way the human brain does, using a powerful three-layer architecture. 
+
+First, we have L1: Surface Memory. This is where we store the raw facts and direct quotes. 
+
+Second, is the L2: Associative Graph. This is the spiderweb. It actively maps out how those isolated facts connect to each other across different documents.
+
+And third, L3: Structural Schemas. This layer captures the deep, underlying patterns of behavior and logic.
+
+Let me show you this brain wiring itself in real time. 
+
+Right now, Dreamweave is ingesting a heavy, completely unstructured dataset. But watch the memory graph on the right. It's not just storing text... it's actively extracting entities, building relationships, and identifying the structural patterns underneath. 
+
+This is the L2 Associative Graph in action. The AI now actually understands the topology of your information. 
+
+But here is where the real magic happens. We built a proprietary safety mechanism called... the Kick. 
+
+If you've seen the movie Inception, you know that a 'kick' is a sudden jolt that pulls you out of a dream when the dream state gets too weird or unstable. Our AI does exactly the same thing. One of the biggest problems with AI today is hallucination—when the model starts dreaming up fake information because the context drifted. 
+
+Let's test it. If I ask a question that suddenly deviates from the established context, the system detects a massive context shift, or a structural hallucination. Watch the user interface. 
+
+Right there. The Kick mechanism fired. You saw the visual alert. Dreamweave mathematically realized the context was failing, halted the hallucination in its tracks, and dynamically re-wired its retrieval path to ground the answer back in reality. All in real-time. 
+
+We aren't building just another AI wrapper. We are building the foundational memory architecture for the next generation of autonomous agents. 
+
+AI shouldn't just talk. It should remember. 
+
+Thank you.

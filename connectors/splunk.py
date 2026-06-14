@@ -18,7 +18,10 @@ class SplunkConnector:
     def __init__(self) -> None:
         self.splunk_host = os.getenv("SPLUNK_HOST", "")
         self.splunk_token = os.getenv("SPLUNK_TOKEN", "")
+        self.splunk_port = os.getenv("SPLUNK_PORT", "8089")
         self.splunk_mcp_url = os.getenv("SPLUNK_MCP_URL", "")
+        self.splunk_hec_url = os.getenv("SPLUNK_HEC_URL", "")
+        self.splunk_hec_token = os.getenv("SPLUNK_HEC_TOKEN", "")
         self.use_simulation = not (self.splunk_host and self.splunk_token) and not self.splunk_mcp_url
         
         # Simulating environment state
@@ -315,3 +318,82 @@ class SplunkConnector:
             {"timestamp": now, "level": "INFO", "service": "redis-cache", "_raw": f"[{now}] redis-cache: GET key:user:8812 - HIT (2ms)"},
             {"timestamp": now, "level": "INFO", "service": "postgres-db", "_raw": f"[{now}] postgres-db: SELECT * FROM accounts - 200 OK (22ms)"}
         ]
+
+    # ── Splunk HTTP Event Collector (HEC) — Push Results Back ────────────────
+
+    async def push_to_splunk(self, event_data: dict[str, Any], sourcetype: str = "txent:investigation", index: str = "main") -> dict[str, Any]:
+        """
+        Pushes TXENT investigation results back to Splunk via HEC.
+        This creates a bidirectional data flow: Splunk → TXENT → Splunk.
+        """
+        if not self.splunk_hec_url or not self.splunk_hec_token:
+            # Log locally if HEC is not configured
+            return {"status": "skipped", "reason": "HEC not configured", "event_logged": True}
+
+        hec_payload = {
+            "event": event_data,
+            "sourcetype": sourcetype,
+            "index": index,
+            "source": "txent:investigator",
+            "time": time.time()
+        }
+
+        try:
+            headers = {"Authorization": f"Splunk {self.splunk_hec_token}"}
+            async with httpx.AsyncClient(verify=False, timeout=5.0) as client:
+                response = await client.post(self.splunk_hec_url, json=hec_payload, headers=headers)
+                response.raise_for_status()
+                return {"status": "sent", "splunk_response": response.json()}
+        except Exception as e:
+            return {"status": "failed", "error": str(e)}
+
+    # ── Splunk MCP Server — Structured Tool Calls ───────────────────────────
+
+    async def mcp_call_tool(self, tool_name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
+        """
+        Calls a tool on the Splunk MCP Server using JSON-RPC 2.0.
+        
+        Available MCP tools (Splunkbase #7931):
+        - splunk_search: Run SPL queries
+        - splunk_get_indexes: List available indexes
+        - splunk_get_saved_searches: Access saved searches  
+        - splunk_kvstore: Read/write KV store entries
+        """
+        if not self.splunk_mcp_url:
+            return {"status": "unavailable", "reason": "MCP URL not configured", "tool": tool_name}
+
+        payload = {
+            "jsonrpc": "2.0",
+            "id": f"txent-{int(time.time())}",
+            "method": "tools/call",
+            "params": {
+                "name": tool_name,
+                "arguments": arguments or {}
+            }
+        }
+
+        try:
+            headers = {"Content-Type": "application/json"}
+            if self.splunk_token:
+                headers["Authorization"] = f"Bearer {self.splunk_token}"
+            
+            async with httpx.AsyncClient(verify=False, timeout=15.0) as client:
+                response = await client.post(self.splunk_mcp_url, json=payload, headers=headers)
+                response.raise_for_status()
+                result = response.json()
+                return {"status": "success", "result": result.get("result", result)}
+        except Exception as e:
+            return {"status": "failed", "error": str(e), "tool": tool_name}
+
+    async def mcp_search(self, spl_query: str, earliest: str = "-15m", latest: str = "now") -> dict[str, Any]:
+        """Convenience wrapper: run an SPL search via MCP Server."""
+        return await self.mcp_call_tool("splunk_search", {
+            "search_query": spl_query,
+            "earliest_time": earliest,
+            "latest_time": latest
+        })
+
+    async def mcp_list_indexes(self) -> dict[str, Any]:
+        """Convenience wrapper: list all Splunk indexes via MCP Server."""
+        return await self.mcp_call_tool("splunk_get_indexes")
+
