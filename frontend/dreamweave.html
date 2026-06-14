@@ -1,0 +1,1902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TXENT — Agentic Observability Memory System</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-deep: #060913;
+      --bg-panel: #0a0d1b;
+      --bg-card: #0f1428;
+      --bg-hover: #161e38;
+      --border: rgba(255, 255, 255, 0.05);
+      --border-bright: rgba(255, 255, 255, 0.12);
+      
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #475569;
+      
+      --accent-purple: #8b5cf6;
+      --accent-purple-glow: rgba(139, 92, 246, 0.15);
+      --accent-blue: #3b82f6;
+      --accent-blue-glow: rgba(59, 130, 246, 0.15);
+      
+      --color-healthy: #10b981;
+      --color-healthy-glow: rgba(16, 185, 129, 0.2);
+      --color-degraded: #f59e0b;
+      --color-degraded-glow: rgba(245, 158, 11, 0.2);
+      --color-critical: #ef4444;
+      --color-critical-glow: rgba(239, 68, 68, 0.35);
+      
+      --sidebar-w: 240px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: var(--bg-deep);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+    }
+
+    /* ─── SIDEBAR ─── */
+    .sidebar {
+      width: var(--sidebar-w);
+      background-color: var(--bg-panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      height: 100%;
+    }
+
+    .brand-section {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 30px;
+      height: 30px;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
+    }
+
+    .brand-logo svg {
+      width: 18px;
+      height: 18px;
+      color: white;
+    }
+
+    .brand-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+
+    .brand-sub {
+      font-size: 9px;
+      color: var(--text-secondary);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-top: 1px;
+    }
+
+    .nav-list {
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .nav-item:hover {
+      background-color: var(--bg-hover);
+      color: var(--text-primary);
+    }
+
+    .nav-item.active {
+      background: linear-gradient(90deg, rgba(139, 92, 246, 0.15), rgba(59, 130, 246, 0.05));
+      border: 1px solid rgba(139, 92, 246, 0.2);
+      color: #a78bfa;
+    }
+
+    .nav-item svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    .system-health {
+      padding: 16px;
+      border-top: 1px solid var(--border);
+      background-color: rgba(0,0,0,0.1);
+    }
+
+    .health-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .health-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 11px;
+    }
+
+    .health-label {
+      color: var(--text-secondary);
+    }
+
+    .health-val {
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .health-val.ok {
+      color: var(--color-healthy);
+    }
+
+    .agent-box {
+      margin: 12px;
+      padding: 12px;
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .agent-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .agent-avatar {
+      width: 24px;
+      height: 24px;
+      background-color: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: var(--accent-blue);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .agent-avatar svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    .agent-title {
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .agent-input-container {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .agent-input {
+      flex: 1;
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-primary);
+      padding: 6px 10px;
+      font-size: 11px;
+      outline: none;
+    }
+
+    .agent-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .agent-btn {
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+      border: none;
+      color: white;
+      padding: 6px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .agent-btn svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    /* ─── MAIN CONTENT ─── */
+    .main-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow-y: auto;
+      background-color: var(--bg-deep);
+    }
+
+    /* Header */
+    .header-bar {
+      height: 60px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      background-color: var(--bg-panel);
+      flex-shrink: 0;
+    }
+
+    .search-wrapper {
+      position: relative;
+      width: 320px;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+    }
+
+    .search-icon svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .search-input {
+      width: 100%;
+      background-color: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-primary);
+      padding: 8px 12px 8px 34px;
+      font-size: 12px;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .search-input:focus {
+      border-color: rgba(139, 92, 246, 0.4);
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .splunk-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .status-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--color-healthy);
+      box-shadow: 0 0 8px var(--color-healthy-glow);
+    }
+
+    .env-select {
+      background-color: var(--bg-deep);
+      border: 1px solid var(--border);
+      color: #c084fc;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 6px;
+      outline: none;
+    }
+
+    /* Dashboard Grid */
+    .dashboard-container {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Counter Cards */
+    .counters-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+    }
+
+    .counter-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .counter-card::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: transparent;
+    }
+
+    .counter-card.active-inc::after { background: var(--color-critical); }
+    .counter-card.kick-card::after { background: var(--color-degraded); }
+    .counter-card.mttr-card::after { background: var(--accent-blue); }
+    .counter-card.resolved-card::after { background: var(--color-healthy); }
+    .counter-card.root-card::after { background: var(--accent-purple); }
+
+    .counter-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-secondary);
+    }
+
+    .counter-val {
+      font-size: 24px;
+      font-weight: 700;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .counter-trend {
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .counter-trend.up { color: var(--color-critical); }
+    .counter-trend.down { color: var(--color-healthy); }
+
+    /* Main Incident View */
+    .incident-investigation-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+
+    .badge {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.05em;
+    }
+
+    .badge.critical {
+      background-color: var(--color-critical-glow);
+      color: var(--color-critical);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .badge.healthy {
+      background-color: var(--color-healthy-glow);
+      color: var(--color-healthy);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    /* Incident Details */
+    .incident-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .incident-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .incident-meta {
+      display: flex;
+      gap: 16px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-family: 'JetBrains Mono', monospace;
+      margin-bottom: 14px;
+    }
+
+    .incident-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    .incident-attr-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      background-color: rgba(0,0,0,0.15);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .attr-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .attr-lbl {
+      font-size: 9px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    .attr-val {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    /* Kick Mechanism Radial Gauge */
+    .kick-split-row {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    .kick-gauge-box {
+      border: 1px solid rgba(239, 68, 68, 0.15);
+      background-color: rgba(239, 68, 68, 0.02);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .kick-radial {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      margin-bottom: 12px;
+    }
+
+    .kick-radial svg {
+      transform: rotate(-90deg);
+      width: 100%;
+      height: 100%;
+    }
+
+    .kick-circle-bg {
+      fill: none;
+      stroke: rgba(255,255,255,0.03);
+      stroke-width: 8;
+    }
+
+    .kick-circle-fill {
+      fill: none;
+      stroke: var(--color-critical);
+      stroke-width: 8;
+      stroke-dasharray: 283;
+      stroke-dashoffset: 28.3; /* 90% */
+      stroke-linecap: round;
+      filter: drop-shadow(0 0 6px var(--color-critical));
+      transition: stroke-dashoffset 0.8s ease;
+    }
+
+    .kick-center-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .kick-center-val {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--color-critical);
+      letter-spacing: 0.05em;
+    }
+
+    .kick-center-lbl {
+      font-size: 9px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .kick-reason-desc {
+      font-size: 12px;
+      color: var(--text-secondary);
+      text-align: center;
+      line-height: 1.4;
+      padding: 0 8px;
+    }
+
+    /* Likely Root Cause Card */
+    .root-cause-box {
+      border: 1px solid rgba(139, 92, 246, 0.15);
+      background-color: rgba(139, 92, 246, 0.02);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .root-cause-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .root-cause-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--color-critical);
+    }
+
+    .root-cause-confidence {
+      background-color: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      color: var(--color-critical);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .evidence-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .evidence-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      line-height: 1.3;
+    }
+
+    .evidence-item svg {
+      width: 14px;
+      height: 14px;
+      color: var(--color-healthy);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* Node Graph Canvas */
+    .system-impact-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1.5fr;
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    .graph-card {
+      position: relative;
+      min-height: 280px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .graph-container {
+      flex: 1;
+      width: 100%;
+      background-color: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Metrics Sparklines */
+    .metrics-card {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .metrics-container {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      flex: 1;
+    }
+
+    .metric-tile {
+      background-color: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .metric-name {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .metric-val-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-top: 4px;
+    }
+
+    .metric-val {
+      font-size: 15px;
+      font-weight: 700;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .metric-trend {
+      font-size: 9px;
+      font-weight: 600;
+    }
+
+    .metric-sparkline {
+      width: 100%;
+      height: 40px;
+      margin-top: 8px;
+    }
+
+    /* Investigation Timeline */
+    .timeline-card {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .timeline-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      position: relative;
+      padding-left: 16px;
+      flex: 1;
+      margin-top: 8px;
+    }
+
+    .timeline-list::before {
+      content: '';
+      position: absolute;
+      left: 3px;
+      top: 4px;
+      bottom: 4px;
+      width: 1px;
+      background-color: var(--border);
+    }
+
+    .timeline-node {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .timeline-dot {
+      position: absolute;
+      left: -16px;
+      top: 4px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: var(--accent-blue);
+      border: 2px solid var(--bg-card);
+      box-shadow: 0 0 6px var(--accent-blue);
+    }
+
+    .timeline-node.critical .timeline-dot {
+      background-color: var(--color-critical);
+      box-shadow: 0 0 6px var(--color-critical);
+    }
+
+    .timeline-node.success .timeline-dot {
+      background-color: var(--color-healthy);
+      box-shadow: 0 0 6px var(--color-healthy-glow);
+    }
+
+    .timeline-time {
+      font-size: 9px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-muted);
+    }
+
+    .timeline-act {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .timeline-details {
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.3;
+    }
+
+    /* Recommended Actions */
+    .actions-card {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .action-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background-color: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .action-item:hover {
+      background-color: var(--bg-hover);
+      border-color: var(--border-bright);
+    }
+
+    .action-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .action-play-btn {
+      width: 24px;
+      height: 24px;
+      background-color: rgba(139, 92, 246, 0.1);
+      border: 1px solid rgba(139, 92, 246, 0.2);
+      color: var(--accent-purple);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .action-play-btn:hover {
+      background-color: var(--accent-purple);
+      color: white;
+    }
+
+    .action-text {
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .action-type {
+      font-size: 9px;
+      font-weight: 700;
+      background-color: rgba(255,255,255,0.05);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--text-secondary);
+    }
+
+    .action-btn-primary {
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+      border: none;
+      color: white;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: opacity 0.2s;
+      margin-top: 8px;
+    }
+
+    .action-btn-primary:hover {
+      opacity: 0.9;
+    }
+
+    /* Chat Panel response styling */
+    .response-chat {
+      background-color: rgba(0,0,0,0.2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 11.5px;
+      font-family: 'JetBrains Mono', monospace;
+      color: #c084fc;
+      margin-top: 8px;
+      max-height: 160px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    /* Ingestion Trigger Button in Integrations */
+    .ingest-trigger-btn {
+      background-color: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: var(--color-critical);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ingest-trigger-btn:hover {
+      background-color: var(--color-critical);
+      color: white;
+    }
+
+    /* Footer layer bar */
+    .footer-bar {
+      height: 45px;
+      background-color: var(--bg-panel);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      flex-shrink: 0;
+    }
+
+    .layers-indicator {
+      display: flex;
+      gap: 16px;
+    }
+
+    .layer-status-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .layer-status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: var(--color-healthy);
+    }
+
+    /* Notification toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background-color: var(--bg-card);
+      border: 1px solid var(--accent-purple);
+      border-radius: 8px;
+      padding: 12px 20px;
+      font-size: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 10000;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- LEFT SIDEBAR -->
+  <div class="sidebar">
+    <div class="brand-section">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 2v4M12 18v4M4 12H2M22 12h-2"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="brand-name">TXENT</h1>
+        <div class="brand-sub">Observability Memory</div>
+      </div>
+    </div>
+
+    <div class="nav-list">
+      <div class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+        Command Center
+      </div>
+      <div class="nav-item" onclick="triggerIncident('cache_saturation')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Trigger Incident
+      </div>
+      <div class="nav-item" onclick="triggerIncident('reset')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        Reset Simulation
+      </div>
+    </div>
+
+    <!-- Agent Box -->
+    <div class="agent-box">
+      <div class="agent-header">
+        <div class="agent-avatar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4M8 16h.01M16 16h.01"/>
+          </svg>
+        </div>
+        <span class="agent-title">TXENT AI Agent</span>
+      </div>
+      <p style="font-size: 10px; color: var(--text-secondary); line-height: 1.3;">
+        I'm actively monitoring your environment and building operational memory.
+      </p>
+      <div class="agent-input-container">
+        <input type="text" id="agentQueryInput" class="agent-input" placeholder="Ask TXENT..." onkeydown="if(event.key==='Enter') sendAgentQuery()">
+        <button class="agent-btn" onclick="sendAgentQuery()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+      <div id="agentResponse" class="response-chat" style="display:none;"></div>
+    </div>
+
+    <div class="system-health">
+      <div class="health-title">System Status</div>
+      <div class="health-row">
+        <span class="health-label">TXENT Engine</span>
+        <span class="health-val ok">Healthy</span>
+      </div>
+      <div class="health-row">
+        <span class="health-label">Memory Layers</span>
+        <span class="health-val ok">Healthy</span>
+      </div>
+      <div class="health-row">
+        <span class="health-label">Splunk MCP</span>
+        <span id="mcpStatusVal" class="health-val ok">Connected</span>
+      </div>
+      <div class="health-row">
+        <span class="health-label">LLM (Gemini)</span>
+        <span class="health-val ok">Online</span>
+      </div>
+      <div class="health-row">
+        <span class="health-label">Vector DB</span>
+        <span class="health-val ok">Healthy</span>
+      </div>
+      
+      <div style="font-size: 9px; color: var(--text-muted); margin-top: 12px; text-align: center;">
+        36,512 incidents stored
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN PANEL -->
+  <div class="main-panel">
+    <div class="header-bar">
+      <div class="search-wrapper">
+        <span class="search-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </span>
+        <input type="text" class="search-input" placeholder="Search anything... (incidents, services, logs, metrics)">
+      </div>
+
+      <div class="header-right">
+        <div class="splunk-status">
+          <div class="status-indicator"></div>
+          Connected to Splunk
+        </div>
+        <select class="env-select">
+          <option>Production</option>
+          <option>Staging</option>
+          <option>Development</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="dashboard-container">
+      <!-- Counters Row -->
+      <div class="counters-row">
+        <div class="counter-card active-inc">
+          <div class="counter-label">Active Incidents</div>
+          <div id="countIncidents" class="counter-val">12</div>
+          <div class="counter-trend up">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 10px; height:10px;"><polyline points="18 15 12 9 6 15"/></svg>
+            2 from last hour
+          </div>
+        </div>
+        <div class="counter-card kick-card">
+          <div class="counter-label">Kick Events</div>
+          <div id="countKicks" class="counter-val">5</div>
+          <div class="counter-trend up">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 10px; height:10px;"><polyline points="18 15 12 9 6 15"/></svg>
+            3 from last hour
+          </div>
+        </div>
+        <div class="counter-card mttr-card">
+          <div class="counter-label">MTTR (24H)</div>
+          <div class="counter-val">28m</div>
+          <div class="counter-trend down" style="color: var(--color-healthy);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 10px; height:10px;"><polyline points="6 9 12 15 18 9"/></svg>
+            18% vs yesterday
+          </div>
+        </div>
+        <div class="counter-card resolved-card">
+          <div class="counter-label">Resolved (24H)</div>
+          <div class="counter-val">27</div>
+          <div class="counter-trend down" style="color: var(--color-healthy);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 10px; height:10px;"><polyline points="18 15 12 9 6 15"/></svg>
+            35% vs yesterday
+          </div>
+        </div>
+        <div class="counter-card root-card">
+          <div class="counter-label">Root Cause Found</div>
+          <div class="counter-val">92%</div>
+          <div class="counter-trend down" style="color: var(--color-healthy);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 10px; height:10px;"><polyline points="18 15 12 9 6 15"/></svg>
+            21% vs yesterday
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Columns -->
+      <div class="incident-investigation-grid">
+        <!-- Left Side Details -->
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+          
+          <!-- Incident Card -->
+          <div class="card">
+            <div class="card-title">
+              INCIDENT UNDER INVESTIGATION
+              <span id="incidentBadge" class="badge critical">CRITICAL</span>
+            </div>
+            
+            <div class="incident-header-row">
+              <h2 id="incidentTitle" class="incident-title">API Latency Increased 400%</h2>
+              <span id="incidentTimeAgo" style="font-size: 11px; color: var(--text-secondary);">2m ago</span>
+            </div>
+            
+            <div class="incident-meta">
+              <span id="incidentId">INC-2025-05-18-001</span>
+              <span>•</span>
+              <span id="incidentService">payment-api</span>
+              <span>•</span>
+              <span>Production</span>
+            </div>
+            
+            <p id="incidentDesc" class="incident-desc">
+              Users are experiencing high latency while calling the payment API. Error rate is also elevated. Database latency has spiked, generating alerts.
+            </p>
+            
+            <div class="incident-attr-grid">
+              <div class="attr-item">
+                <span class="attr-lbl">Severity</span>
+                <span id="attrSeverity" class="attr-val" style="color: var(--color-critical);">Critical</span>
+              </div>
+              <div class="attr-item">
+                <span class="attr-lbl">Impacted Service</span>
+                <span id="attrService" class="attr-val">payment-api</span>
+              </div>
+              <div class="attr-item">
+                <span class="attr-lbl">Environment</span>
+                <span class="attr-val">Production</span>
+              </div>
+              <div class="attr-item">
+                <span class="attr-lbl">Detected By</span>
+                <span id="attrSource" class="attr-val">Splunk Alert</span>
+              </div>
+              <div class="attr-item">
+                <span class="attr-lbl">Status</span>
+                <span id="attrStatus" class="attr-val" style="color: var(--color-degraded);">Under Analysis</span>
+              </div>
+            </div>
+
+            <!-- Kick & Root Cause Split -->
+            <div class="kick-split-row">
+              <!-- Kick Status Gauge -->
+              <div class="kick-gauge-box">
+                <div class="kick-radial">
+                  <svg viewBox="0 0 36 36">
+                    <path class="kick-circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    <path id="kickCircleFill" class="kick-circle-fill" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  </svg>
+                  <div class="kick-center-text">
+                    <span id="kickGaugeStatus" class="kick-center-val">KICK TRIGGERED</span>
+                    <span id="kickGaugeScore" class="kick-center-lbl">91%</span>
+                  </div>
+                </div>
+                <div id="kickReasonText" class="kick-reason-desc">
+                  Surface alert indicates database issue, but historical patterns suggest cache saturation downstream.
+                </div>
+              </div>
+
+              <!-- Root Cause Summary -->
+              <div class="root-cause-box">
+                <div class="root-cause-header">
+                  <span class="root-cause-title">LIKELY ROOT CAUSE (in progress)</span>
+                  <span id="rootCauseConfidence" class="root-cause-confidence">94%</span>
+                </div>
+                
+                <h3 id="rootCauseName" style="font-size: 18px; font-weight: 700; color: var(--color-critical);">Redis Memory Exhaustion</h3>
+                
+                <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-top: 4px;">Supporting Evidence</div>
+                
+                <div id="evidenceList" class="evidence-list">
+                  <div class="evidence-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    Similar to 17 historical incidents
+                  </div>
+                  <div class="evidence-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    Redis memory usage is 98%
+                  </div>
+                  <div class="evidence-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    Cache hit ratio dropped to 12%
+                  </div>
+                  <div class="evidence-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    Database latency is a downstream effect
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Topology & Metrics Grid -->
+          <div class="system-impact-grid">
+            <!-- Node Graph -->
+            <div class="card graph-card">
+              <div class="card-title">SYSTEM IMPACT OVERVIEW</div>
+              <div class="graph-container">
+                <canvas id="topoCanvas" style="width: 100%; height: 100%; display: block;"></canvas>
+              </div>
+            </div>
+
+            <!-- Metrics -->
+            <div class="card metrics-card">
+              <div class="card-title">
+                METRICS SNAPSHOT (last 15 minutes)
+                <a href="#" style="font-size: 11px; color: var(--accent-purple); text-decoration: none; font-weight: 600;" onclick="showToast('Querying Splunk Enterprise REST API...', 'success')">Open in Splunk →</a>
+              </div>
+              <div class="metrics-container">
+                <div class="metric-tile">
+                  <span class="metric-name">API Latency (ms)</span>
+                  <div class="metric-val-row">
+                    <span id="metricAPIVal" class="metric-val">1250</span>
+                    <span id="metricAPITrend" class="metric-trend" style="color: var(--color-critical);">+412%</span>
+                  </div>
+                  <canvas id="apiSpark" class="metric-sparkline"></canvas>
+                </div>
+                <div class="metric-tile">
+                  <span class="metric-name">Redis Memory Usage</span>
+                  <div class="metric-val-row">
+                    <span id="metricRedisVal" class="metric-val">98%</span>
+                    <span id="metricRedisTrend" class="metric-trend" style="color: var(--color-critical);">+18%</span>
+                  </div>
+                  <canvas id="redisSpark" class="metric-sparkline"></canvas>
+                </div>
+                <div class="metric-tile">
+                  <span class="metric-name">Error Rate</span>
+                  <div class="metric-val-row">
+                    <span id="metricErrorVal" class="metric-val">6.2%</span>
+                    <span id="metricErrorTrend" class="metric-trend" style="color: var(--color-critical);">+5.1%</span>
+                  </div>
+                  <canvas id="errorSpark" class="metric-sparkline"></canvas>
+                </div>
+                <div class="metric-tile">
+                  <span class="metric-name">DB Connections</span>
+                  <div class="metric-val-row">
+                    <span id="metricDBVal" class="metric-val">42</span>
+                    <span id="metricDBTrend" class="metric-trend" style="color: var(--color-critical);">+35%</span>
+                  </div>
+                  <canvas id="dbSpark" class="metric-sparkline"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right Side Investigation Timeline & Recommendations -->
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+          <!-- Investigation Timeline -->
+          <div class="card timeline-card">
+            <div class="card-title">INVESTIGATION TIMELINE</div>
+            <div id="timelineList" class="timeline-list">
+              <div class="timeline-node critical">
+                <div class="timeline-dot"></div>
+                <span class="timeline-time">10:24:15</span>
+                <span class="timeline-act">Incident detected by Splunk</span>
+                <span class="timeline-details">API Latency spike alert triggered.</span>
+              </div>
+              <div class="timeline-node critical">
+                <div class="timeline-dot"></div>
+                <span class="timeline-time">10:24:16</span>
+                <span class="timeline-act">Kick mechanism triggered</span>
+                <span class="timeline-details">Divergence score: 0.91. Downstream database timeout contradicts cache healthy baseline pattern.</span>
+              </div>
+              <div class="timeline-node">
+                <div class="timeline-dot"></div>
+                <span class="timeline-time">10:24:17</span>
+                <span class="timeline-act">Retrieving similar incidents</span>
+                <span class="timeline-details">Found 17 historically similar incidents in L1 Surface Memory related to Cache Saturation.</span>
+              </div>
+              <div class="timeline-node">
+                <div class="timeline-dot"></div>
+                <span class="timeline-time">10:24:18</span>
+                <span class="timeline-act">Querying Splunk via MCP</span>
+                <span class="timeline-details">Executing SPL queries on logs, traces, and metrics.</span>
+              </div>
+              <div class="timeline-node">
+                <div class="timeline-dot"></div>
+                <span class="timeline-time">10:24:21</span>
+                <span class="timeline-act">Analyzing Redis metrics</span>
+                <span class="timeline-details">Redis VRAM utilization = 98.4%, maxmemory limit reached.</span>
+              </div>
+              <div class="timeline-node">
+                <div class="timeline-dot"></div>
+                <span class="timeline-time">10:24:24</span>
+                <span class="timeline-act">Correlating dependencies</span>
+                <span class="timeline-details">L2 graph shows payment-api is dependent on redis-cache. Cache failure creates database load.</span>
+              </div>
+              <div class="timeline-node success">
+                <div class="timeline-dot"></div>
+                <span class="timeline-time">10:24:28</span>
+                <span class="timeline-act">Root cause identified</span>
+                <span class="timeline-details">Redis Memory Exhaustion. Recommending cluster scale-up or volatile keys flush.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recommended Actions -->
+          <div class="card actions-card">
+            <div class="card-title">RECOMMENDED ACTIONS</div>
+            <div id="actionsList" style="display: flex; flex-direction: column; gap: 8px;">
+              <div class="action-item" onclick="executeRemediation('scale_redis')">
+                <div class="action-left">
+                  <div class="action-play-btn">
+                    <svg viewBox="0 0 24 24" fill="currentColor" style="width: 10px; height:10px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  </div>
+                  <span class="action-text">Scale Redis cluster memory</span>
+                </div>
+                <span class="action-type">Automatable</span>
+              </div>
+              
+              <div class="action-item" onclick="executeRemediation('clear_keys')">
+                <div class="action-left">
+                  <div class="action-play-btn">
+                    <svg viewBox="0 0 24 24" fill="currentColor" style="width: 10px; height:10px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  </div>
+                  <span class="action-text">Clear expired volatile keys</span>
+                </div>
+                <span class="action-type">Automatable</span>
+              </div>
+
+              <div class="action-item" onclick="executeRemediation('monitor_memory')">
+                <div class="action-left">
+                  <div class="action-play-btn">
+                    <svg viewBox="0 0 24 24" fill="currentColor" style="width: 10px; height:10px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  </div>
+                  <span class="action-text">Monitor memory usage alerting threshold</span>
+                </div>
+                <span class="action-type">Automatable</span>
+              </div>
+
+              <div class="action-item" onclick="executeRemediation('review_traffic')">
+                <div class="action-left">
+                  <div class="action-play-btn" style="background-color: rgba(255,255,255,0.05); color: var(--text-secondary);">
+                    <svg viewBox="0 0 24 24" fill="currentColor" style="width: 10px; height:10px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  </div>
+                  <span class="action-text">Review traffic patterns</span>
+                </div>
+                <span class="action-type" style="background-color: rgba(245,158,11,0.1); color: var(--color-degraded);">Manual</span>
+              </div>
+            </div>
+            <button class="action-btn-primary" onclick="executeRemediation('scale_redis')">Execute All Automatable (3)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FOOTER LAYER BAR -->
+    <div class="footer-bar">
+      <div class="layers-indicator">
+        <div class="layer-status-pill">
+          <div class="layer-status-dot"></div>
+          <span>L1 Surface Memory: <strong>HEALTHY</strong></span>
+        </div>
+        <div class="layer-status-pill">
+          <div class="layer-status-dot"></div>
+          <span>L2 Associative Graph: <strong>HEALTHY</strong></span>
+        </div>
+        <div class="layer-status-pill">
+          <div class="layer-status-dot"></div>
+          <span>L3 Structural Pattern: <strong>HEALTHY</strong></span>
+        </div>
+        <div class="layer-status-pill">
+          <div class="layer-status-dot" style="background-color: var(--color-healthy);"></div>
+          <span>L4 Operational Archetypes: <strong>HEALTHY</strong></span>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span>Real-time Ingestion: <strong>2,847 events/min</strong></span>
+        <canvas id="ingestSpark" style="width: 60px; height: 16px;"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTIFICATION TOAST -->
+  <div id="toast" class="toast">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 16px; height: 16px; color: var(--color-healthy);">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+    <span id="toastMessage">Recommendation executed successfully.</span>
+  </div>
+
+  <!-- GRAPH AND METRICS JS -->
+  <script>
+    const API_BASE = ""; // local api
+
+    // ─── TOPOLOGY DRAWING ───
+    const canvas = document.getElementById('topoCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Nodes position details
+    let nodes = [
+      { name: "payment-api", type: "SERVICE", status: "critical", latency: "Latency: 450%", x: 0.5, y: 0.5, size: 28 },
+      { name: "redis-cache", type: "CACHE", status: "critical", label: "Critical", x: 0.75, y: 0.35, size: 22 },
+      { name: "postgres-db", type: "DATABASE", status: "degraded", label: "Degraded", x: 0.75, y: 0.65, size: 22 },
+      { name: "auth-service", type: "SERVICE", status: "healthy", label: "Healthy", x: 0.25, y: 0.35, size: 22 },
+      { name: "user-service", type: "SERVICE", status: "healthy", label: "Healthy", x: 0.5, y: 0.2, size: 22 },
+      { name: "order-service", type: "SERVICE", status: "degraded", label: "Degraded", x: 0.25, y: 0.65, size: 22 }
+    ];
+
+    const edges = [
+      { from: 0, to: 1 },
+      { from: 0, to: 2 },
+      { from: 0, to: 3 },
+      { from: 0, to: 4 },
+      { from: 0, to: 5 }
+    ];
+
+    function drawTopology() {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * window.devicePixelRatio;
+      canvas.height = rect.height * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      
+      const width = rect.width;
+      const height = rect.height;
+
+      ctx.clearRect(0, 0, width, height);
+
+      // Draw Edges
+      ctx.lineWidth = 1.5;
+      edges.forEach(edge => {
+        const fromNode = nodes[edge.from];
+        const toNode = nodes[edge.to];
+        
+        ctx.beginPath();
+        ctx.moveTo(fromNode.x * width, fromNode.y * height);
+        ctx.lineTo(toNode.x * width, toNode.y * height);
+        
+        // Edge color based on target node status
+        if (toNode.status === 'critical') {
+          ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+        } else if (toNode.status === 'degraded') {
+          ctx.strokeStyle = 'rgba(245, 158, 11, 0.3)';
+        } else {
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        }
+        ctx.stroke();
+      });
+
+      // Draw Nodes
+      nodes.forEach(node => {
+        const nx = node.x * width;
+        const ny = node.y * height;
+        
+        // Glow effect
+        ctx.beginPath();
+        ctx.arc(nx, ny, node.size + 6, 0, Math.PI * 2);
+        if (node.status === 'critical') {
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+        } else if (node.status === 'degraded') {
+          ctx.fillStyle = 'rgba(245, 158, 11, 0.1)';
+        } else {
+          ctx.fillStyle = 'rgba(16, 185, 129, 0.05)';
+        }
+        ctx.fill();
+
+        // Node center
+        ctx.beginPath();
+        ctx.arc(nx, ny, node.size, 0, Math.PI * 2);
+        if (node.status === 'critical') {
+          ctx.fillStyle = '#1e1b29';
+          ctx.strokeStyle = '#ef4444';
+        } else if (node.status === 'degraded') {
+          ctx.fillStyle = '#1b1b22';
+          ctx.strokeStyle = '#f59e0b';
+        } else {
+          ctx.fillStyle = '#0f172a';
+          ctx.strokeStyle = '#10b981';
+        }
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
+
+        // Node labels
+        ctx.fillStyle = '#f1f5f9';
+        ctx.font = '600 11px Outfit';
+        ctx.textAlign = 'center';
+        ctx.fillText(node.name, nx, ny - 2);
+
+        ctx.fillStyle = node.status === 'critical' ? '#ef4444' : node.status === 'degraded' ? '#f59e0b' : '#94a3b8';
+        ctx.font = '500 9px Outfit';
+        ctx.fillText(node.latency || node.label || node.type, nx, ny + 10);
+      });
+    }
+
+    // Resize list
+    window.addEventListener('resize', drawTopology);
+    setTimeout(drawTopology, 200);
+
+    // ─── SPARKLINE GENERATION ───
+    function drawSparkline(canvasId, points, color) {
+      const c = document.getElementById(canvasId);
+      if (!c) return;
+      const rect = c.getBoundingClientRect();
+      c.width = rect.width * 2;
+      c.height = rect.height * 2;
+      const w = c.width;
+      const h = c.height;
+      const ctxSpark = c.getContext('2d');
+      ctxSpark.scale(2, 2);
+      
+      const sw = rect.width;
+      const sh = rect.height;
+
+      ctxSpark.clearRect(0, 0, sw, sh);
+      
+      if (!points || points.length < 2) return;
+
+      const max = Math.max(...points);
+      const min = Math.min(...points);
+      const range = max - min === 0 ? 1 : max - min;
+
+      ctxSpark.beginPath();
+      ctxSpark.lineWidth = 1.5;
+      ctxSpark.strokeStyle = color;
+      
+      const step = sw / (points.length - 1);
+      points.forEach((p, idx) => {
+        const px = idx * step;
+        const py = sh - ((p - min) / range) * (sh - 4) - 2;
+        if (idx === 0) {
+          ctxSpark.moveTo(px, py);
+        } else {
+          ctxSpark.lineTo(px, py);
+        }
+      });
+      ctxSpark.stroke();
+
+      // Draw gradient under line
+      ctxSpark.lineTo(sw, sh);
+      ctxSpark.lineTo(0, sh);
+      ctxSpark.closePath();
+      const grad = ctxSpark.createLinearGradient(0, 0, 0, sh);
+      grad.addColorStop(0, color.replace('1)', '0.15)'));
+      grad.addColorStop(1, color.replace('1)', '0)'));
+      ctxSpark.fillStyle = grad;
+      ctxSpark.fill();
+    }
+
+    // Default simulation metric spark data
+    let apiData = [120, 140, 110, 130, 150, 135, 120, 160, 480, 890, 1150, 1250];
+    let redisData = [58, 58, 58.1, 58, 58.2, 58.3, 58.1, 88.0, 95.0, 97.4, 98.1, 98.4];
+    let errorData = [0.1, 0.2, 0.1, 0.3, 0.2, 0.1, 0.2, 1.8, 3.4, 4.9, 5.8, 6.2];
+    let dbData = [15, 17, 18, 16, 17, 18, 18, 26, 34, 38, 40, 42];
+    
+    function refreshSparklines() {
+      drawSparkline('apiSpark', apiData, 'rgba(239, 68, 68, 1)');
+      drawSparkline('redisSpark', redisData, 'rgba(239, 68, 68, 1)');
+      drawSparkline('errorSpark', errorData, 'rgba(239, 68, 68, 1)');
+      drawSparkline('dbSpark', dbData, 'rgba(239, 68, 68, 1)');
+      drawSparkline('ingestSpark', [2400, 2500, 2450, 2600, 2800, 2750, 2847], 'rgba(16, 185, 129, 1)');
+    }
+    
+    setTimeout(refreshSparklines, 500);
+
+    // ─── INTERACTIVE ACTIONS ───
+    
+    // Shows alert notification toast
+    function showToast(message, type='success') {
+      const toast = document.getElementById('toast');
+      const msgSpan = document.getElementById('toastMessage');
+      
+      msgSpan.textContent = message;
+      if (type === 'error') {
+        toast.style.borderColor = 'var(--color-critical)';
+      } else {
+        toast.style.borderColor = 'var(--color-healthy)';
+      }
+      
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 4000);
+    }
+
+    // Triggers custom Splunk incident injection
+    async function triggerIncident(incidentType) {
+      showToast(`Ingesting simulated Splunk logs and metrics: ${incidentType}...`, 'success');
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/ingest/incident`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ incident_type: incidentType })
+        });
+        
+        if (!response.ok) throw new Error("HTTP error " + response.status);
+        const data = await response.json();
+        
+        if (incidentType === 'reset') {
+          showToast("Telemetry metrics reset to normal baseline status.", 'success');
+          resetUIHealthy();
+        } else {
+          showToast(`Splunk Alert Ingested: ${data.incident.title}`, 'success');
+          updateUIAnomaly(data.incident);
+        }
+      } catch (e) {
+        showToast("Error communicating with simulator API: " + e.message, 'error');
+      }
+    }
+
+    // Updates UI elements to represent an active anomaly alert
+    function updateUIAnomaly(incident) {
+      // Counters
+      document.getElementById('countIncidents').textContent = '13';
+      document.getElementById('countKicks').textContent = '6';
+
+      // Incident Panel
+      document.getElementById('incidentBadge').textContent = 'CRITICAL';
+      document.getElementById('incidentBadge').className = 'badge critical';
+      document.getElementById('incidentTitle').textContent = incident.title;
+      document.getElementById('incidentId').textContent = incident.incident_id;
+      document.getElementById('incidentService').textContent = incident.service;
+      document.getElementById('incidentDesc').textContent = incident.description;
+      
+      document.getElementById('attrSeverity').textContent = 'Critical';
+      document.getElementById('attrSeverity').style.color = 'var(--color-critical)';
+      document.getElementById('attrService').textContent = incident.service;
+      document.getElementById('attrSource').textContent = incident.source;
+      document.getElementById('attrStatus').textContent = 'Under Analysis';
+      document.getElementById('attrStatus').style.color = 'var(--color-degraded)';
+      
+      // Kick status circle
+      document.getElementById('kickCircleFill').style.strokeDashoffset = '28.3'; // 90%
+      document.getElementById('kickGaugeStatus').textContent = 'KICK TRIGGERED';
+      document.getElementById('kickGaugeStatus').style.color = 'var(--color-critical)';
+      document.getElementById('kickGaugeScore').textContent = '91%';
+      document.getElementById('kickReasonText').textContent = 'Surface alert indicates database timeout, but historical patterns suggest cache saturation.';
+      
+      // Root Cause Card
+      document.getElementById('rootCauseName').textContent = 'Redis Memory Exhaustion';
+      document.getElementById('rootCauseName').style.color = 'var(--color-critical)';
+      document.getElementById('rootCauseConfidence').textContent = '94%';
+      document.getElementById('rootCauseConfidence').style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+      document.getElementById('rootCauseConfidence').style.color = 'var(--color-critical)';
+      
+      // Evidence
+      document.getElementById('evidenceList').innerHTML = `
+        <div class="evidence-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>Similar to 17 historical incidents</div>
+        <div class="evidence-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>Redis memory usage is 98%</div>
+        <div class="evidence-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>Cache hit ratio dropped to 12%</div>
+        <div class="evidence-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>Database latency is a downstream effect</div>
+      `;
+      
+      // Node Graph Status reset
+      nodes[0].status = 'critical'; // payment-api
+      nodes[1].status = 'critical'; // redis-cache
+      nodes[2].status = 'degraded'; // postgres-db
+      nodes[5].status = 'degraded'; // order-service
+      drawTopology();
+
+      // Metric tiles
+      document.getElementById('metricAPIVal').textContent = '1250';
+      document.getElementById('metricAPITrend').textContent = '+412%';
+      document.getElementById('metricAPITrend').style.color = 'var(--color-critical)';
+      
+      document.getElementById('metricRedisVal').textContent = '98%';
+      document.getElementById('metricRedisTrend').textContent = '+18%';
+      document.getElementById('metricRedisTrend').style.color = 'var(--color-critical)';
+      
+      document.getElementById('metricErrorVal').textContent = '6.2%';
+      document.getElementById('metricErrorTrend').textContent = '+5.1%';
+      document.getElementById('metricErrorTrend').style.color = 'var(--color-critical)';
+      
+      document.getElementById('metricDBVal').textContent = '42';
+      document.getElementById('metricDBTrend').textContent = '+35%';
+      document.getElementById('metricDBTrend').style.color = 'var(--color-critical)';
+
+      // Timeline List
+      document.getElementById('timelineList').innerHTML = `
+        <div class="timeline-node critical"><div class="timeline-dot"></div><span class="timeline-time">10:24:15</span><span class="timeline-act">Incident detected by Splunk</span><span class="timeline-details">API Latency spike alert triggered.</span></div>
+        <div class="timeline-node critical"><div class="timeline-dot"></div><span class="timeline-time">10:24:16</span><span class="timeline-act">Kick mechanism triggered</span><span class="timeline-details">Divergence score: 0.91. Downstream database timeout contradicts cache healthy baseline pattern.</span></div>
+        <div class="timeline-node"><div class="timeline-dot"></div><span class="timeline-time">10:24:17</span><span class="timeline-act">Retrieving similar incidents</span><span class="timeline-details">Found 17 historically similar incidents in L1 Surface Memory related to Cache Saturation.</span></div>
+        <div class="timeline-node"><div class="timeline-dot"></div><span class="timeline-time">10:24:18</span><span class="timeline-act">Querying Splunk via MCP</span><span class="timeline-details">Executing SPL queries on logs, traces, and metrics.</span></div>
+        <div class="timeline-node"><div class="timeline-dot"></div><span class="timeline-time">10:24:21</span><span class="timeline-act">Analyzing Redis metrics</span><span class="timeline-details">Redis VRAM utilization = 98.4%, maxmemory limit reached.</span></div>
+        <div class="timeline-node"><div class="timeline-dot"></div><span class="timeline-time">10:24:24</span><span class="timeline-act">Correlating dependencies</span><span class="timeline-details">L2 graph shows payment-api is dependent on redis-cache. Cache failure creates database load.</span></div>
+        <div class="timeline-node success"><div class="timeline-dot"></div><span class="timeline-time">10:24:28</span><span class="timeline-act">Root cause identified</span><span class="timeline-details">Redis Memory Exhaustion. Recommending cluster scale-up or volatile keys flush.</span></div>
+      `;
+
+      // Sparklines Spiked
+      apiData = [120, 140, 110, 130, 150, 135, 120, 160, 480, 890, 1150, 1250];
+      redisData = [58, 58, 58.1, 58, 58.2, 58.3, 58.1, 88.0, 95.0, 97.4, 98.1, 98.4];
+      errorData = [0.1, 0.2, 0.1, 0.3, 0.2, 0.1, 0.2, 1.8, 3.4, 4.9, 5.8, 6.2];
+      dbData = [15, 17, 18, 16, 17, 18, 18, 26, 34, 38, 40, 42];
+      refreshSparklines();
+    }
+
+    // Resets UI elements to a healthy state
+    function resetUIHealthy() {
+      // Counters
+      document.getElementById('countIncidents').textContent = '0';
+      document.getElementById('countKicks').textContent = '0';
+
+      // Incident Panel
+      document.getElementById('incidentBadge').textContent = 'RESOLVED';
+      document.getElementById('incidentBadge').className = 'badge healthy';
+      document.getElementById('incidentTitle').textContent = 'All Services Nominal';
+      document.getElementById('incidentId').textContent = 'INC-NONE';
+      document.getElementById('incidentService').textContent = 'none';
+      document.getElementById('incidentDesc').textContent = 'No active system anomalies detected. All microservice telemetry trends are sitting within target operational thresholds.';
+      
+      document.getElementById('attrSeverity').textContent = 'Info';
+      document.getElementById('attrSeverity').style.color = 'var(--color-healthy)';
+      document.getElementById('attrService').textContent = 'none';
+      document.getElementById('attrSource').textContent = 'System Check';
+      document.getElementById('attrStatus').textContent = 'Resolved';
+      document.getElementById('attrStatus').style.color = 'var(--color-healthy)';
+      
+      // Kick status circle
+      document.getElementById('kickCircleFill').style.strokeDashoffset = '283'; // 0%
+      document.getElementById('kickGaugeStatus').textContent = 'NOMINAL';
+      document.getElementById('kickGaugeStatus').style.color = 'var(--color-healthy)';
+      document.getElementById('kickGaugeScore').textContent = '0%';
+      document.getElementById('kickReasonText').textContent = 'Layers consistent. Ingested alerts align perfectly with structural expectations.';
+      
+      // Root Cause Card
+      document.getElementById('rootCauseName').textContent = 'None Detected';
+      document.getElementById('rootCauseName').style.color = 'var(--color-healthy)';
+      document.getElementById('rootCauseConfidence').textContent = '0%';
+      document.getElementById('rootCauseConfidence').style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
+      document.getElementById('rootCauseConfidence').style.color = 'var(--color-healthy)';
+      
+      // Evidence
+      document.getElementById('evidenceList').innerHTML = `
+        <div class="evidence-item" style="color: var(--color-healthy);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color: var(--color-healthy);"><polyline points="20 6 9 17 4 12"/></svg>Redis cache hit ratio at 95.4%</div>
+        <div class="evidence-item" style="color: var(--color-healthy);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color: var(--color-healthy);"><polyline points="20 6 9 17 4 12"/></svg>DB connections pool utilization at 18%</div>
+        <div class="evidence-item" style="color: var(--color-healthy);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color: var(--color-healthy);"><polyline points="20 6 9 17 4 12"/></svg>API response latencies nominal (150ms)</div>
+      `;
+      
+      // Node Graph Status reset
+      nodes.forEach(node => {
+        node.status = 'healthy';
+        node.latency = null;
+        if(node.name === 'payment-api') node.label = 'Healthy';
+      });
+      drawTopology();
+
+      // Metric tiles
+      document.getElementById('metricAPIVal').textContent = '150';
+      document.getElementById('metricAPITrend').textContent = '0.0%';
+      document.getElementById('metricAPITrend').style.color = 'var(--color-healthy)';
+      
+      document.getElementById('metricRedisVal').textContent = '58%';
+      document.getElementById('metricRedisTrend').textContent = '0.0%';
+      document.getElementById('metricRedisTrend').style.color = 'var(--color-healthy)';
+      
+      document.getElementById('metricErrorVal').textContent = '0.2%';
+      document.getElementById('metricErrorTrend').textContent = '0.0%';
+      document.getElementById('metricErrorTrend').style.color = 'var(--color-healthy)';
+      
+      document.getElementById('metricDBVal').textContent = '18';
+      document.getElementById('metricDBTrend').textContent = '0.0%';
+      document.getElementById('metricDBTrend').style.color = 'var(--color-healthy)';
+
+      // Timeline List
+      document.getElementById('timelineList').innerHTML = `
+        <div class="timeline-node success"><div class="timeline-dot"></div><span class="timeline-time">10:35:00</span><span class="timeline-act">Remediation Action Executed</span><span class="timeline-details">Redis cluster memory scaled. Keys flushed.</span></div>
+        <div class="timeline-node success"><div class="timeline-dot"></div><span class="timeline-time">10:35:05</span><span class="timeline-act">Telemetry Health Restored</span><span class="timeline-details">All service latencies returned to healthy baseline values.</span></div>
+      `;
+
+      // Sparklines normal
+      apiData = [120, 140, 110, 130, 150, 135, 120, 150, 148, 150, 152, 150];
+      redisData = [58, 58, 58.1, 58, 58.2, 58.3, 58.1, 58.2, 58.4, 58.1, 58.3, 58.2];
+      errorData = [0.1, 0.2, 0.1, 0.3, 0.2, 0.1, 0.2, 0.15, 0.2, 0.1, 0.2, 0.2];
+      dbData = [15, 17, 18, 16, 17, 18, 18, 18, 19, 18, 18, 18];
+      refreshSparklines();
+    }
+
+    // Call API to execute remediation action
+    async function executeRemediation(actionId) {
+      showToast(`Executing action: ${actionId.replace(/_/g, ' ')}...`, 'success');
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/actions/execute`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action_id: actionId })
+        });
+        
+        if (!response.ok) throw new Error("HTTP error " + response.status);
+        const data = await response.json();
+        
+        showToast(data.message, 'success');
+        resetUIHealthy();
+      } catch (e) {
+        showToast("Error calling remediation API: " + e.message, 'error');
+      }
+    }
+
+    // Sends a query to the TXENT AI Agent Chat input
+    async function sendAgentQuery() {
+      const input = document.getElementById('agentQueryInput');
+      const box = document.getElementById('agentResponse');
+      const text = input.value.trim();
+      
+      if (!text) return;
+      
+      showToast(`Querying TXENT Memory Engine...`, 'success');
+      box.style.display = 'block';
+      box.textContent = "Querying memory layers...";
+      input.value = "";
+      
+      try {
+        const response = await fetch(`${API_BASE}/retrieve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: text, generate_answer: true, max_tokens: 300, kick_enabled: true })
+        });
+        
+        if (!response.ok) throw new Error("HTTP error " + response.status);
+        const data = await response.json();
+        
+        // Show answer
+        box.innerHTML = `<strong>Answer:</strong> ${data.answer}`;
+        
+        // If a kick fired during search, update UI to reflect it!
+        if (data.kick && data.kick.fired) {
+          showToast(`⚠️ KICK TRIGGERED: ${data.kick.message}`, 'error');
+          if (data.agent_investigation) {
+            updateUIAnomaly({
+              title: data.query,
+              incident_id: data.agent_investigation.incident_id || "INC-2025-05-18-001",
+              service: data.agent_investigation.health_status ? Object.keys(data.agent_investigation.health_status)[0] : "payment-api",
+              description: data.kick.reason,
+              source: "Search Discovery"
+            });
+          }
+        }
+      } catch (e) {
+        box.textContent = "Error: " + e.message;
+      }
+    }
+    
+    // Check initial health and set MCP status on load
+    async function checkConnectorHealth() {
+      try {
+        const res = await fetch(`${API_BASE}/api/splunk/status`);
+        if (res.ok) {
+          const d = await res.json();
+          const el = document.getElementById('mcpStatusVal');
+          if (el) {
+            el.textContent = d.mode === 'simulation' ? 'Simulated' : 'Connected';
+            el.className = 'health-val ok';
+          }
+        }
+      } catch(e) {}
+    }
+    
+    window.addEventListener('load', () => {
+      checkConnectorHealth();
+      setInterval(checkConnectorHealth, 15000);
+    });
+  </script>
+</body>
+</html>
