@@ -30,7 +30,7 @@ class TXENTOrchestrator:
 
     def __init__(self) -> None:
         self.embedding_model_name = os.getenv("EMBEDDING_MODEL", "all-mpnet-base-v2")
-        self.memory_dir = Path(os.getenv("DREAMWEAVE_MEMORY_DIR", "memory_store"))
+        self.memory_dir = Path(os.getenv("TXENT_MEMORY_DIR", "memory_store"))
         self.memory_dir.mkdir(parents=True, exist_ok=True)
         self.sources: dict[str, dict[str, Any]] = {}
         self.started_at = time.time()
@@ -51,7 +51,7 @@ class TXENTOrchestrator:
             threshold=float(os.getenv("KICK_THRESHOLD", "0.42")),
         )
         
-        if os.getenv("DREAMWEAVE_AUTO_LOAD", "true").lower() == "true":
+        if os.getenv("TXENT_AUTO_LOAD", "true").lower() == "true":
             self.load_memory()
 
     def ingest(self, text: str, source: str = "manual", metadata: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -115,6 +115,12 @@ class TXENTOrchestrator:
         # Launch Autonomous Investigation Agent if Kick fires
         agent_result = None
         if kick_result.get("fired"):
+            # Increment the simulation's kick count for the dashboard
+            if "kick_count" in self.splunk.simulation_state:
+                self.splunk.simulation_state["kick_count"] += 1
+            else:
+                self.splunk.simulation_state["kick_count"] = 1
+                
             # Construct standard incident payload based on query details
             incident = self.splunk.simulation_state.get("current_incident")
             if not incident:
@@ -360,10 +366,6 @@ class TXENTOrchestrator:
         }
 
     def _auto_save(self) -> None:
-        if os.getenv("DREAMWEAVE_AUTO_SAVE", "true").lower() == "true":
+        if os.getenv("TXENT_AUTO_SAVE", "true").lower() == "true":
             self.save_memory()
-
-
-# Backward-compatible alias
-DreamWeaveOrchestrator = TXENTOrchestrator
 

@@ -10,3 +10,11 @@ memory_store/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+
+# Devpost submission and temporary files
+DEVPOST.md
+summary.md
+scratch_*.py
+test_upload.txt
+*.png
+architecture.png

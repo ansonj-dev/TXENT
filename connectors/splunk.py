@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import time
+import asyncio
 import random
 from typing import Any
 import httpx
@@ -20,13 +21,18 @@ class SplunkConnector:
         self.splunk_token = os.getenv("SPLUNK_TOKEN", "")
         self.splunk_port = os.getenv("SPLUNK_PORT", "8089")
         self.splunk_mcp_url = os.getenv("SPLUNK_MCP_URL", "")
+        # MCP Server uses a separate encrypted token (different from the standard JWT)
+        self.splunk_mcp_token = os.getenv("SPLUNK_MCP_TOKEN", self.splunk_token)
         self.splunk_hec_url = os.getenv("SPLUNK_HEC_URL", "")
         self.splunk_hec_token = os.getenv("SPLUNK_HEC_TOKEN", "")
         self.use_simulation = not (self.splunk_host and self.splunk_token) and not self.splunk_mcp_url
+        self._readings_cache: dict[str, Any] | None = None
+        self._readings_cache_at = 0.0
         
         # Simulating environment state
         self.simulation_state = {
             "current_incident": None,
+            "kick_count": 0,
             "metrics": {
                 "payment-api": {"latency": 150, "error_rate": 0.2, "cpu": 35, "memory": 45, "connections": 15},
                 "redis-cache": {"latency": 2, "error_rate": 0.0, "cpu": 15, "memory": 58, "hit_ratio": 95},
@@ -41,6 +47,12 @@ class SplunkConnector:
             ],
             "incident_history": []
         }
+
+    def _management_base_url(self) -> str:
+        host = self.splunk_host.strip().rstrip("/")
+        if host.startswith(("http://", "https://")):
+            return host
+        return f"https://{host}:{self.splunk_port}"
 
     async def get_status(self) -> dict[str, Any]:
         """Checks connections and returns the connector status."""
@@ -66,7 +78,7 @@ class SplunkConnector:
             try:
                 headers = {"Authorization": f"Bearer {self.splunk_token}"}
                 async with httpx.AsyncClient(verify=False, timeout=3.0) as client:
-                    url = f"https://{self.splunk_host.strip('/')}:8089/services/server/info?output_mode=json"
+                    url = f"{self._management_base_url()}/services/server/info?output_mode=json"
                     response = await client.get(url, headers=headers)
                     if response.status_code == 200:
                         status["splunk_rest"] = "connected"
@@ -96,7 +108,7 @@ class SplunkConnector:
             return self._generate_simulated_logs(query)
             
         headers = {"Authorization": f"Bearer {self.splunk_token}"}
-        url = f"https://{self.splunk_host.strip('/')}:8089/services/search/jobs?output_mode=json"
+        jobs_url = f"{self._management_base_url()}/services/search/jobs"
         
         try:
             async with httpx.AsyncClient(verify=False, timeout=10.0) as client:
@@ -105,9 +117,10 @@ class SplunkConnector:
                 data = {
                     "search": search_query,
                     "earliest_time": earliest,
-                    "latest_time": latest
+                    "latest_time": latest,
+                    "output_mode": "json"
                 }
-                response = await client.post(url, headers=headers, data=data)
+                response = await client.post(jobs_url, headers=headers, data=data)
                 response.raise_for_status()
                 sid = response.json().get("sid")
                 
@@ -115,9 +128,9 @@ class SplunkConnector:
                     return []
                 
                 # 2. Poll for completion
-                job_url = f"{url}/{sid}?output_mode=json"
+                job_url = f"{jobs_url}/{sid}?output_mode=json"
                 for _ in range(10):
-                    time.sleep(0.5)
+                    await asyncio.sleep(0.5)
                     job_res = await client.get(job_url, headers=headers)
                     job_res.raise_for_status()
                     job_data = job_res.json()
@@ -126,7 +139,7 @@ class SplunkConnector:
                         break
                 
                 # 3. Retrieve results
-                results_url = f"{url}/{sid}/results?output_mode=json"
+                results_url = f"{jobs_url}/{sid}/results?output_mode=json"
                 res_response = await client.get(results_url, headers=headers)
                 res_response.raise_for_status()
                 return res_response.json().get("results", [])
@@ -136,6 +149,59 @@ class SplunkConnector:
                 {"_raw": f"Splunk query failed ({str(e)}). Falling back to simulated records.", "source": "txent-connector", "host": "splunk-mcp"},
                 *self._generate_simulated_logs(query)
             ]
+
+    async def get_enterprise_readings(self) -> dict[str, Any]:
+        """
+        Returns Splunk Enterprise dashboard readings when live connectors are
+        reachable, otherwise returns simulator data with the same shape.
+        """
+        now = time.time()
+        if self._readings_cache and now - self._readings_cache_at < 10:
+            return self._readings_cache
+
+        status = await self.get_status()
+        live_rest = status.get("splunk_rest") == "connected"
+        live_mcp = status.get("splunk_mcp") == "connected"
+
+        if live_rest:
+            readings = await self.search_logs(
+                'index=_internal source=*metrics.log group=per_sourcetype_thruput | stats sum(kb) as kb by series | sort - kb | head 5',
+                earliest="-15m",
+            )
+            self._readings_cache = {
+                "mode": "live",
+                "status": status,
+                "source": "splunk_enterprise_rest",
+                "readings": readings[:5],
+                "service_metrics": self.simulation_state.get("metrics", {}),
+            }
+            self._readings_cache_at = time.time()
+            return self._readings_cache
+
+        if live_mcp:
+            readings = await self.mcp_search(
+                'index=_internal | stats count by sourcetype | sort - count | head 5',
+                earliest="-15m",
+            )
+            self._readings_cache = {
+                "mode": "live",
+                "status": status,
+                "source": "splunk_mcp",
+                "readings": readings,
+                "service_metrics": self.simulation_state.get("metrics", {}),
+            }
+            self._readings_cache_at = time.time()
+            return self._readings_cache
+
+        self._readings_cache = {
+            "mode": "simulation",
+            "status": status,
+            "source": "txent_simulator",
+            "readings": self._generate_simulated_logs("index=main txent dashboard readings")[:5],
+            "service_metrics": self.simulation_state.get("metrics", {}),
+        }
+        self._readings_cache_at = time.time()
+        return self._readings_cache
 
     async def query_metrics(self, service: str, duration_minutes: int = 15) -> dict[str, list[float] | list[str]]:
         """Queries telemetry metrics for a service."""
@@ -351,12 +417,16 @@ class SplunkConnector:
 
     async def mcp_call_tool(self, tool_name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
         """
-        Calls a tool on the Splunk MCP Server using JSON-RPC 2.0.
-        
-        Available MCP tools (Splunkbase #7931):
+        Calls a tool on the Splunk MCP Server.
+
+        The Splunk MCP Server uses SSE (Server-Sent Events) transport over HTTP.
+        Endpoint: https://127.0.0.1:8089/services/mcp
+        Auth:     Bearer <encrypted MCP token>
+
+        Available tools:
         - splunk_search: Run SPL queries
         - splunk_get_indexes: List available indexes
-        - splunk_get_saved_searches: Access saved searches  
+        - splunk_get_saved_searches: Access saved searches
         - splunk_kvstore: Read/write KV store entries
         """
         if not self.splunk_mcp_url:
@@ -372,18 +442,52 @@ class SplunkConnector:
             }
         }
 
+        mcp_auth = self.splunk_mcp_token or self.splunk_token
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream, application/json",
+        }
+        if mcp_auth:
+            headers["Authorization"] = f"Bearer {mcp_auth}"
+
         try:
-            headers = {"Content-Type": "application/json"}
-            if self.splunk_token:
-                headers["Authorization"] = f"Bearer {self.splunk_token}"
-            
-            async with httpx.AsyncClient(verify=False, timeout=15.0) as client:
-                response = await client.post(self.splunk_mcp_url, json=payload, headers=headers)
-                response.raise_for_status()
-                result = response.json()
-                return {"status": "success", "result": result.get("result", result)}
+            async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
+                async with client.stream("POST", self.splunk_mcp_url, json=payload, headers=headers) as response:
+                    content_type = response.headers.get("content-type", "")
+
+                    # SSE path — Splunk MCP Server streams back events
+                    if "text/event-stream" in content_type:
+                        collected_data = ""
+                        async for line in response.aiter_lines():
+                            line = line.strip()
+                            if line.startswith("data:"):
+                                collected_data += line[5:].strip()
+                            elif line == "" and collected_data:
+                                try:
+                                    import json as _json
+                                    msg = _json.loads(collected_data)
+                                    if "result" in msg:
+                                        return {"status": "success", "result": msg["result"], "transport": "sse"}
+                                    elif "error" in msg:
+                                        return {"status": "mcp_error", "error": msg["error"], "tool": tool_name}
+                                except Exception:
+                                    pass
+                                collected_data = ""
+                        return {"status": "sse_empty", "reason": "No result in SSE stream", "tool": tool_name}
+
+                    # Plain JSON path — fallback
+                    else:
+                        body = await response.aread()
+                        import json as _json
+                        result = _json.loads(body)
+                        if "result" in result:
+                            return {"status": "success", "result": result["result"], "transport": "json"}
+                        return {"status": "success", "result": result, "transport": "json"}
+
         except Exception as e:
+            # Graceful fallback — REST API or simulation will handle the query
             return {"status": "failed", "error": str(e), "tool": tool_name}
+
 
     async def mcp_search(self, spl_query: str, earliest: str = "-15m", latest: str = "now") -> dict[str, Any]:
         """Convenience wrapper: run an SPL search via MCP Server."""

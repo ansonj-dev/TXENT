@@ -20,8 +20,39 @@ class AutonomousInvestigationAgent:
         self.splunk = splunk_connector
         self.gemini_key = os.getenv("GEMINI_API_KEY", "")
         self.openai_key = os.getenv("OPENAI_API_KEY", "")
-        self.llm_url = os.getenv("LLM_URL", "http://localhost:30000/v1/chat/completions")
-        self.llm_model = os.getenv("LLM_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+        
+        default_url = "http://localhost:30000/v1/chat/completions"
+        default_model = "Qwen/Qwen2.5-7B-Instruct"
+        
+        if self.gemini_key:
+            self.llm_url = os.getenv("LLM_URL")
+            if not self.llm_url or "localhost" in self.llm_url or "127.0.0.1" in self.llm_url:
+                self.llm_url = "https://generativelanguage.googleapis.com/v1beta/openai/v1/chat/completions"
+            
+            gemini_model_env = os.getenv("GEMINI_MODEL")
+            llm_model_env = os.getenv("LLM_MODEL")
+            if gemini_model_env:
+                self.llm_model = gemini_model_env
+            elif llm_model_env and "gemini" in llm_model_env.lower():
+                self.llm_model = llm_model_env
+            else:
+                self.llm_model = "gemini-2.5-flash"
+        elif self.openai_key:
+            self.llm_url = os.getenv("LLM_URL")
+            if not self.llm_url or "localhost" in self.llm_url or "127.0.0.1" in self.llm_url:
+                self.llm_url = "https://api.openai.com/v1/chat/completions"
+            
+            openai_model_env = os.getenv("OPENAI_MODEL")
+            llm_model_env = os.getenv("LLM_MODEL")
+            if openai_model_env:
+                self.llm_model = openai_model_env
+            elif llm_model_env and "gpt" in llm_model_env.lower():
+                self.llm_model = llm_model_env
+            else:
+                self.llm_model = "gpt-4o-mini"
+        else:
+            self.llm_url = os.getenv("LLM_URL", default_url)
+            self.llm_model = os.getenv("LLM_MODEL", default_model)
 
     async def investigate(self, incident: dict[str, Any], l3_schemas: list[dict[str, Any]]) -> dict[str, Any]:
         """

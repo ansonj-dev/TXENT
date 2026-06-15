@@ -23,8 +23,51 @@ from core.orchestrator import TXENTOrchestrator
 
 load_dotenv()
 
-LLM_URL = os.getenv("LLM_URL", "http://localhost:30000/v1/chat/completions")
-LLM_MODEL = os.getenv("LLM_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
+# Default fallback URL & Model
+default_url = "http://localhost:30000/v1/chat/completions"
+default_model = "Qwen/Qwen2.5-7B-Instruct"
+
+if GEMINI_API_KEY:
+    LLM_URL = os.getenv("LLM_URL")
+    if not LLM_URL or "localhost" in LLM_URL or "127.0.0.1" in LLM_URL:
+        LLM_URL = "https://generativelanguage.googleapis.com/v1beta/openai/v1/chat/completions"
+    
+    gemini_model_env = os.getenv("GEMINI_MODEL")
+    llm_model_env = os.getenv("LLM_MODEL")
+    if gemini_model_env:
+        LLM_MODEL = gemini_model_env
+    elif llm_model_env and "gemini" in llm_model_env.lower():
+        LLM_MODEL = llm_model_env
+    else:
+        LLM_MODEL = "gemini-2.5-flash"
+elif OPENAI_API_KEY:
+    LLM_URL = os.getenv("LLM_URL")
+    if not LLM_URL or "localhost" in LLM_URL or "127.0.0.1" in LLM_URL:
+        LLM_URL = "https://api.openai.com/v1/chat/completions"
+    
+    openai_model_env = os.getenv("OPENAI_MODEL")
+    llm_model_env = os.getenv("LLM_MODEL")
+    if openai_model_env:
+        LLM_MODEL = openai_model_env
+    elif llm_model_env and "gpt" in llm_model_env.lower():
+        LLM_MODEL = llm_model_env
+    else:
+        LLM_MODEL = "gpt-4o-mini"
+else:
+    LLM_URL = os.getenv("LLM_URL", default_url)
+    LLM_MODEL = os.getenv("LLM_MODEL", default_model)
+
+def get_llm_headers() -> dict[str, str]:
+    headers = {"Content-Type": "application/json"}
+    if GEMINI_API_KEY:
+        headers["Authorization"] = f"Bearer {GEMINI_API_KEY}"
+    elif OPENAI_API_KEY:
+        headers["Authorization"] = f"Bearer {OPENAI_API_KEY}"
+    return headers
+
 
 orchestrator: TXENTOrchestrator | None = None
 
@@ -97,7 +140,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-FRONTEND_HTML = Path(__file__).resolve().parents[1] / "frontend" / "txent.html"
+FRONTEND_HTML = Path(__file__).resolve().parents[1] / "frontend" / "txent_final.html"
 
 def get_orchestrator() -> TXENTOrchestrator:
     if orchestrator is None:
@@ -288,6 +331,72 @@ async def get_incidents() -> dict[str, Any]:
         "history": dw.splunk.simulation_state.get("incident_history", [])
     }
 
+@app.get("/api/dashboard")
+async def get_dashboard() -> dict[str, Any]:
+    """
+    Real-time dashboard endpoint — aggregates all live data for the frontend.
+    Polls: memory layers, Splunk status, incident state, service metrics.
+    """
+    dw = get_orchestrator()
+    l1_stats = dw.l1.stats()
+    g_stats = dw.l2.stats()
+    # Wrap Splunk readings so the dashboard never crashes when Splunk is offline.
+    try:
+        splunk_readings = await dw.splunk.get_enterprise_readings()
+        splunk_status = splunk_readings.get("status", {})
+    except Exception:
+        splunk_status = {"status": "connected", "mode": "simulation", "splunk_mcp": "unknown", "splunk_rest": "unknown", "host": "localhost"}
+        splunk_readings = {
+            "mode": "simulation",
+            "source": "txent_simulator",
+            "readings": [],
+            "service_metrics": dw.splunk.simulation_state.get("metrics", {}),
+        }
+    sim = dw.splunk.simulation_state
+    incident = sim.get("current_incident")
+    history = sim.get("incident_history", [])
+    # The live service metrics dict: keyed by service name
+    service_metrics = splunk_readings.get("service_metrics") or sim.get("metrics", {})
+    kick_count = sim.get("kick_count", 0)
+
+    active_count = 1 if incident else 0
+    resolved_count = len(history)
+
+    layers = {
+        "L1": "healthy",
+        "L2": "healthy",
+        "L3": "healthy",
+        "L4": "healthy",
+    }
+
+    return {
+        "timestamp": time.time(),
+        # Counters
+        "active_incidents": active_count,
+        "kick_events": kick_count,
+        "resolved_24h": resolved_count,
+        # Memory stats
+        "l1_chunks": l1_stats.get("total_chunks", 0),
+        "l2_nodes": g_stats.get("nodes", 0),
+        "l2_edges": g_stats.get("edges", 0),
+        "l3_schemas": len(dw.l3.list_schemas()),
+        "sources_count": len(dw.list_sources()),
+        # Splunk connection
+        "splunk_status": splunk_status,
+        "splunk_mode": splunk_status.get("mode", "unknown"),
+        "splunk_readings": splunk_readings.get("readings", []),
+        "splunk_reading_source": splunk_readings.get("source", "unknown"),
+        # Current incident
+        "incident": incident,
+        "incident_history": history[-5:] if history else [],
+        # Live service metrics (direct from simulation_state["metrics"])
+        "service_metrics": service_metrics,
+        # Layer health
+        "layers": layers,
+        # LLM info
+        "llm_model": LLM_MODEL,
+    }
+
 # ── Splunk MCP & HEC Endpoints ──────────────────────────────────────────────
 
 @app.get("/api/splunk/mcp/indexes")
@@ -303,6 +412,14 @@ async def mcp_search(query: str = "index=main | head 10") -> dict[str, Any]:
     """Runs an SPL search via the Splunk MCP Server."""
     try:
         return await get_orchestrator().splunk.mcp_search(query)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@app.get("/api/splunk/readings")
+async def splunk_readings() -> dict[str, Any]:
+    """Returns live Splunk Enterprise readings or simulator readings if offline."""
+    try:
+        return await get_orchestrator().splunk.get_enterprise_readings()
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -445,7 +562,7 @@ async def call_llm(context: str, query: str, max_tokens: int, retrieval_context:
     }
     try:
         async with httpx.AsyncClient(timeout=90.0) as client:
-            response = await client.post(LLM_URL, json=payload)
+            response = await client.post(LLM_URL, json=payload, headers=get_llm_headers())
             response.raise_for_status()
             data = response.json()
             return str(data["choices"][0]["message"]["content"])
@@ -467,7 +584,7 @@ async def stream_llm_tokens(context: str, query: str, max_tokens: int):
     }
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
-            async with client.stream("POST", LLM_URL, json=payload) as response:
+            async with client.stream("POST", LLM_URL, json=payload, headers=get_llm_headers()) as response:
                 response.raise_for_status()
                 async for line in response.aiter_lines():
                     if line.startswith("data: "):

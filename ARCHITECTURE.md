@@ -3,7 +3,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          TXENT COMMAND CENTER                               │
-│                     (frontend/txent.html — Browser UI)                       │
+│                  (frontend/txent_final.html — Browser UI)                    │
 │  ┌──────────┐  ┌──────────────┐  ┌────────────┐  ┌──────────────────────┐  │
 │  │ Incident  │  │  Memory      │  │ Knowledge  │  │ Investigation       │  │
 │  │ Trigger   │  │  Retrieval   │  │ Graph      │  │ Results Panel       │  │
@@ -15,7 +15,7 @@
 │                        FastAPI Backend (api/main.py)                         │
 │                                                                              │
 │   POST /api/ingest/incident    POST /retrieve    GET /graph                  │
-│   POST /api/actions/execute    GET /health        GET /api/splunk/status      │
+│   POST /api/actions/execute    GET /api/dashboard GET /api/splunk/readings    │
 └──────────────────────────────────┬───────────────────────────────────────────┘
                                    │
                                    ▼

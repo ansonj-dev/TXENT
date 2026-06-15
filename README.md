@@ -79,9 +79,9 @@ TXENT is built on a **4-layer cognitive memory architecture** inspired by how ex
 |-----------|--------|------|
 | **Kick Detector** | `core/kick.py` | Fires when surface alerts contradict historical structural patterns (divergence > configurable threshold). |
 | **Investigation Agent** | `agents/investigator.py` | Autonomous agent that runs Splunk queries, builds evidence timelines, and compiles root-cause reports with actionable remediations. |
-| **Splunk Connector** | `connectors/splunk.py` | Integrates with Splunk Enterprise REST API, Splunk MCP Server, and HTTP Event Collector. Includes high-fidelity simulation fallback for demo/development. |
-| **FastAPI Backend** | `api/main.py` | Full REST API with SSE streaming, health checks, memory management, and incident simulation endpoints. |
-| **Command Center UI** | `frontend/txent.html` | Real-time interactive dashboard for monitoring incidents, viewing investigations, and executing remediations. |
+| **Splunk Connector** | `connectors/splunk.py` | Integrates with Splunk Enterprise REST API, Splunk MCP Server, and HTTP Event Collector. Includes cached live readings plus high-fidelity simulation fallback for demo/development. |
+| **FastAPI Backend** | `api/main.py` | Full REST API with dashboard polling, SSE streaming, health checks, memory management, and incident simulation endpoints. |
+| **Command Center UI** | `frontend/txent_final.html` | Real-time interactive dashboard for monitoring incidents, viewing Splunk readings, investigating events, and executing remediations. |
 
 ---
 
@@ -91,7 +91,7 @@ TXENT is built on a **4-layer cognitive memory architecture** inspired by how ex
 - ⚡ **Kick Mechanism** — Automatic contradiction detection between surface alerts and deep patterns
 - 🤖 **Autonomous Investigation** — Agent queries Splunk, builds timelines, and reports root cause
 - 🔗 **Splunk Enterprise Integration** — REST API, MCP Server, and HEC bidirectional data flow
-- 📊 **Real-Time Dashboard** — Interactive command center with live SSE streaming
+- 📊 **Real-Time Dashboard** — Interactive command center that uses `/api/dashboard` for live Splunk readings and falls back to demo telemetry when offline
 - 🧪 **Incident Simulation** — Trigger realistic observability scenarios for testing and demos
 - 🎯 **7 Pattern Signatures** — Pre-built structural patterns for common operational failure modes
 - 💡 **Remediation Actions** — Actionable recommendations that can be executed from the UI
@@ -135,9 +135,11 @@ KICK_THRESHOLD=0.42
 API_PORT=8000
 
 # Splunk Enterprise (optional — simulator runs without these)
-SPLUNK_HOST=https://your-splunk-instance:8089
+SPLUNK_HOST=your-splunk-instance
+SPLUNK_PORT=8089
 SPLUNK_TOKEN=your-splunk-auth-token
-SPLUNK_MCP_URL=http://localhost:3000
+SPLUNK_MCP_URL=https://your-splunk-instance:8089/services/mcp
+SPLUNK_MCP_TOKEN=your-mcp-token
 
 # LLM backend (optional — retrieval-based answers work without LLM)
 LLM_URL=http://localhost:8001/v1/chat/completions
@@ -154,7 +156,7 @@ python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 
 Navigate to **[http://localhost:8000](http://localhost:8000)** in your browser.
 
-You'll see the TXENT Command Center — trigger a simulated incident, watch the Kick mechanism fire, and observe the autonomous investigation unfold in real time.
+You'll see the TXENT Command Center. If Splunk Enterprise is reachable, the dashboard shows live REST/MCP status and readings. If the backend cannot reach Splunk, it automatically stays functional in demo mode so you can trigger incidents, watch the Kick mechanism fire, and observe the autonomous investigation flow.
 
 ---
 
@@ -164,29 +166,32 @@ TXENT connects to Splunk through three integration points:
 
 | Integration | Env Variable | Purpose |
 |-------------|-------------|---------|
-| **REST API** | `SPLUNK_HOST` | Search queries, metrics retrieval, index data |
-| **MCP Server** | `SPLUNK_MCP_URL` | Model Context Protocol for structured agent-Splunk communication |
-| **HEC** | *(via REST API)* | Bidirectional event ingestion from TXENT back into Splunk |
+| **REST API** | `SPLUNK_HOST`, `SPLUNK_PORT`, `SPLUNK_TOKEN` | Search queries, dashboard readings, server status, metrics/index data |
+| **MCP Server** | `SPLUNK_MCP_URL`, `SPLUNK_MCP_TOKEN` | Model Context Protocol for structured agent-Splunk communication |
+| **HEC** | `SPLUNK_HEC_URL`, `SPLUNK_HEC_TOKEN` | Bidirectional event ingestion from TXENT back into Splunk |
 
 ### Connecting to Splunk Enterprise
 
 1. **Generate an auth token** in Splunk: *Settings → Tokens → New Token*
 2. **Set environment variables** in your `.env`:
    ```ini
-   SPLUNK_HOST=https://your-splunk-host:8089
+   SPLUNK_HOST=your-splunk-host
+   SPLUNK_PORT=8089
    SPLUNK_TOKEN=your-auth-token
    ```
 3. **Install the Splunk MCP Server** (optional, for Model Context Protocol integration):
    ```ini
-   SPLUNK_MCP_URL=http://localhost:3000
+   SPLUNK_MCP_URL=https://your-splunk-host:8089/services/mcp
+   SPLUNK_MCP_TOKEN=your-mcp-token
    ```
 4. **Verify connectivity**:
    ```bash
    curl http://localhost:8000/api/splunk/status
+   curl http://localhost:8000/api/splunk/readings
    ```
 
 > [!TIP]
-> **No Splunk instance?** No problem. TXENT includes a high-fidelity simulation mode that generates realistic metrics, incidents, and service topologies. The simulator activates automatically when Splunk environment variables are not configured.
+> **No Splunk instance?** No problem. TXENT includes a high-fidelity simulation mode that generates realistic metrics, incidents, and service topologies. The simulator activates automatically when Splunk environment variables are not configured or when live Splunk is temporarily unreachable.
 
 ---
 
@@ -210,7 +215,12 @@ TXENT connects to Splunk through three integration points:
 | `GET` | `/metrics` | Compact metrics for monitoring |
 | `GET` | `/sources` | List all ingested data sources |
 | `DELETE` | `/sources/{id}` | Remove a data source |
+| `GET` | `/api/dashboard` | Aggregated dashboard state with live Splunk readings or simulator fallback |
 | `GET` | `/api/splunk/status` | Splunk Enterprise & MCP connection status |
+| `GET` | `/api/splunk/readings` | Live Splunk Enterprise readings or simulator readings if offline |
+| `GET` | `/api/splunk/mcp/indexes` | List Splunk indexes via MCP when configured |
+| `POST` | `/api/splunk/mcp/search` | Run an SPL query through Splunk MCP |
+| `POST` | `/api/splunk/hec/test` | Push a test event to Splunk HEC |
 | `POST` | `/api/ingest/incident` | Trigger a simulated incident |
 | `POST` | `/api/actions/execute` | Execute a recommended remediation action |
 | `GET` | `/api/incidents` | List active and historical incidents |
@@ -256,7 +266,7 @@ TXENT/
 │   └── investigator.py          # Autonomous investigation agent
 ├── api/
 │   ├── __init__.py
-│   └── main.py                  # FastAPI backend with SSE streaming
+│   └── main.py                  # FastAPI backend with dashboard, Splunk, and SSE endpoints
 ├── connectors/
 │   └── splunk.py                # Splunk REST API / MCP / HEC connector
 ├── core/
@@ -266,7 +276,7 @@ TXENT/
 ├── demo/
 │   └── seed_data.py             # Demo seed data for quick showcases
 ├── frontend/
-│   └── txent.html               # Interactive Command Center dashboard
+│   └── txent_final.html         # Interactive Command Center dashboard
 ├── layers/
 │   ├── __init__.py
 │   ├── l1_surface.py            # L1: Surface Memory (vector store)

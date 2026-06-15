@@ -58,7 +58,7 @@ def post_json(path: str, payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def main() -> None:
-    print("Seeding DREAMWEAVE demo memory")
+    print("Seeding TXENT demo memory")
     for document in DOCUMENTS:
         text = textwrap.dedent(document["text"]).strip()
         result = post_json("/ingest", {"text": text, "source": document["source"]})
